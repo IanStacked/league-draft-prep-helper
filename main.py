@@ -27,6 +27,25 @@ def get_puuid(game_name, tag_line, riot_api_key):
         print(f"An error occurred: {e}")
         return None
     
+def get_recent_matches(puuid, riot_api_key):
+    api_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&count=50"
+    headers = {
+        "X-Riot-Token": riot_api_key,
+        "Accept": "application/json",
+        "User-Agent": "LeagueHelperApp/1.0"
+    }
+    try:
+        response = requests.get(api_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            match_ids = response.json()
+            return match_ids
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        return None
+    
 def main():
     load_dotenv()
     RIOT_API_KEY = os.getenv("RIOT_API_KEY")
@@ -36,7 +55,10 @@ def main():
     game_name = input("Game Name: ",)
     tag_line = input("Tag Line: ",)
     puuid = get_puuid(game_name, tag_line, RIOT_API_KEY)
-    print(puuid)
+    recent_matches = get_recent_matches(puuid, RIOT_API_KEY)
+    print(f"PUUID: {puuid}")
+    print(f"Recent Matches: {recent_matches}")
+
 
 if __name__ == "__main__":
     main()
