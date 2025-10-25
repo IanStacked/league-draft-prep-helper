@@ -1,5 +1,6 @@
 import os
 import requests
+import gspread
 from dotenv import load_dotenv
 
 def get_puuid(game_name, tag_line, riot_api_key):
@@ -65,31 +66,71 @@ def get_match_details(match_id, riot_api_key):
         print(f"An error occurred: {e}")
         return None
 
-def extract_player_info(match_details, puuid):
+def extract_player_champ_info(match_details, puuid):
     participants = match_details.get('info', {}).get('participants', [])
     for participant in participants:
         if participant.get('puuid') == puuid:
             return participant.get('championName')
     return None
+
+def get_player_mastery(puuid, riot_api_key):
+    api_url = f"https://na1.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}/top?count=15"
+    headers = {
+        "X-Riot-Token": riot_api_key,
+        "Accept": "application/json",
+        "User-Agent": "LeagueHelperApp/1.0"
+    }
+    try:
+        response = requests.get(api_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            mastery_info = response.json()
+            return mastery_info
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        return None
+    
+def collect_league_data(RIOT_API_KEY, game_name, tag_line):
+    player_info = []
+    puuid = get_puuid(game_name, tag_line, RIOT_API_KEY)
+    recent_matches = get_recent_matches(puuid, RIOT_API_KEY)
+    mastery_info = get_player_mastery(puuid, RIOT_API_KEY)
+    champions_played = []
+    for match in recent_matches:
+        champions_played.append(extract_player_champ_info(get_match_details(match,RIOT_API_KEY), puuid))
+    player_info.append({
+        "game_name": game_name,
+        "champions_played": champions_played
+    })
+    return player_info
     
 def main():
     load_dotenv()
     RIOT_API_KEY = os.getenv("RIOT_API_KEY")
-    GOOGLE_SHEETS_API_KEY = os.getenv("GOOGLE_SHEETS_API_KEY")
-
     print("Please input player information, format example: Game Name: frenzy, Tag Line: aja, for riotid frenzy#aja")
     game_name = input("Game Name: ",)
     tag_line = input("Tag Line: ",)
-    puuid = get_puuid(game_name, tag_line, RIOT_API_KEY)
-    recent_matches = get_recent_matches(puuid, RIOT_API_KEY)
-    # only testing getting match details for the first recent match, can just loop over recent_matches when needed
-    match_details = get_match_details(recent_matches[0], RIOT_API_KEY)
-    champion_name = extract_player_info(match_details, puuid)
+    #player_info = collect_league_data(RIOT_API_KEY, game_name, tag_line)
+    
+    #google sheets integration here
+    gc = gspread.service_account(filename='credentials.json')
+    try:
+        sh = gc.open_by_key("1wp9h_LorMKCMWHLCfBOjq8WlZUuw2mgYlUqnJv7GeXY")
+    except gspread.SpreadsheetNotFound:
+        print("Error: Spreadsheet not found")
+        exit(1)
+    worksheet = sh.worksheet("Sheet5")
+    worksheet.update_cell(1, 1, "Test")
+    
 
+    #match_details = get_match_details(recent_matches[0], RIOT_API_KEY)
+    #champion_name = extract_player_info(match_details, puuid)
     #print(f"PUUID: {puuid}")
     #print(f"Recent Matches: {recent_matches}")
     #print(f"Match Details for Match ID {recent_matches[0]}: {match_details}")
-    print (f"Champion played {champion_name}")
+    #print (f"Champion played {champion_name}")
 
 if __name__ == "__main__":
     main()
