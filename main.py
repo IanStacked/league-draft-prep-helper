@@ -64,6 +64,13 @@ def get_match_details(match_id, riot_api_key):
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
         return None
+
+def extract_player_info(match_details, puuid):
+    participants = match_details.get('info', {}).get('participants', [])
+    for participant in participants:
+        if participant.get('puuid') == puuid:
+            return participant.get('championName')
+    return None
     
 def main():
     load_dotenv()
@@ -77,9 +84,12 @@ def main():
     recent_matches = get_recent_matches(puuid, RIOT_API_KEY)
     # only testing getting match details for the first recent match, can just loop over recent_matches when needed
     match_details = get_match_details(recent_matches[0], RIOT_API_KEY)
-    print(f"PUUID: {puuid}")
-    print(f"Recent Matches: {recent_matches}")
-    print(f"Match Details for Match ID {recent_matches[0]}: {match_details}")
+    champion_name = extract_player_info(match_details, puuid)
+
+    #print(f"PUUID: {puuid}")
+    #print(f"Recent Matches: {recent_matches}")
+    #print(f"Match Details for Match ID {recent_matches[0]}: {match_details}")
+    print (f"Champion played {champion_name}")
 
 if __name__ == "__main__":
     main()
