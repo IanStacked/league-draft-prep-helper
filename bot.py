@@ -2,6 +2,12 @@ import discord
 import os
 from dotenv import load_dotenv
 from discord.ext import commands
+from utils import collect_league_data
+
+# API Keys
+load_dotenv()
+DISCORD_KEY = os.getenv("DISCORD_PUBLIC_KEY")
+RIOT_API_KEY = os.getenv("RIOT_API_KEY")
 
 # Bot Information
 BOT_PREFIX = "!"
@@ -34,9 +40,30 @@ async def hello(ctx):
     user_name = ctx.author.display_name
     await ctx.send(f"Hello {user_name}")
 
+@bot.command(name="scout", help="Finds information on league player given riotid")
+async def scout(ctx, *, riot_id):
+    riot_id_tuple = parse_riot_id(riot_id)
+    if not riot_id_tuple:
+        await ctx.send("Invalid input, please ensure syntax is: !scout username#tagline")
+        return
+    player_info = collect_league_data(RIOT_API_KEY, riot_id_tuple[0], riot_id_tuple[1])
+    for champ in player_info[0]["sorted_champions_played"]:
+        await ctx.send(champ)
+    
+# Helper Functions
+def parse_riot_id(unclean_riot_id):
+    clean_riot_id = unclean_riot_id.strip()
+    if "#" not in clean_riot_id:
+        return None
+    parts = clean_riot_id.split("#",1)
+    username = parts[0]
+    tagline = parts[1]
+    if not username or not tagline:
+        return None
+    return (username,tagline)
+        
+
 def bot_startup():
-    load_dotenv()
-    DISCORD_KEY = os.getenv("DISCORD_PUBLIC_KEY")
     try:
         bot.run(DISCORD_KEY)
     except discord.errors.LoginFailure:
