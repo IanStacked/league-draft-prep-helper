@@ -1,16 +1,16 @@
 import os
 import requests
 import gspread
+import time
 from dotenv import load_dotenv
 from collections import Counter
+from ratelimit import limits, sleep_and_retry
+from bot import bot_startup
 
-def get_puuid(game_name, tag_line, riot_api_key):
-    api_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
-    headers = {
-        "X-Riot-Token": riot_api_key,
-        "Accept": "application/json",
-        "User-Agent": "LeagueHelperApp/1.0"
-    }
+CALLS = 100
+PERIOD = 120  # seconds
+
+def call_riot_api(api_url, headers):
     try:
         # Make the GET request with timeout
         response = requests.get(api_url, headers=headers, timeout=10)  # 10 seconds timeout
@@ -19,8 +19,7 @@ def get_puuid(game_name, tag_line, riot_api_key):
         if response.status_code == 200:
             # Parse the JSON response
             data = response.json()
-            puuid = data.get('puuid')
-            return puuid
+            return data
         else:
             # Print an error message
             print(f"Error: {response.status_code} - {response.text}")
@@ -29,6 +28,17 @@ def get_puuid(game_name, tag_line, riot_api_key):
         print(f"An error occurred: {e}")
         return None
     
+def get_puuid(game_name, tag_line, riot_api_key):
+    api_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
+    headers = {
+        "X-Riot-Token": riot_api_key,
+        "Accept": "application/json",
+        "User-Agent": "LeagueHelperApp/1.0"
+    }
+    data = call_riot_api(api_url, headers)
+    puuid = data.get('puuid')
+    return puuid
+
 def get_recent_matches(puuid, riot_api_key):
     api_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&count=50"
     headers = {
@@ -36,17 +46,8 @@ def get_recent_matches(puuid, riot_api_key):
         "Accept": "application/json",
         "User-Agent": "LeagueHelperApp/1.0"
     }
-    try:
-        response = requests.get(api_url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            match_ids = response.json()
-            return match_ids
-        else:
-            print(f"Error: {response.status_code} - {response.text}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-        return None
+    match_ids = call_riot_api(api_url, headers)
+    return match_ids
     
 def get_match_details(match_id, riot_api_key):
     api_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{match_id}"
@@ -55,17 +56,8 @@ def get_match_details(match_id, riot_api_key):
         "Accept": "application/json",
         "User-Agent": "LeagueHelperApp/1.0"
     }
-    try:
-        response = requests.get(api_url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            match_details = response.json()
-            return match_details
-        else:
-            print(f"Error: {response.status_code} - {response.text}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-        return None
+    match_details = call_riot_api(api_url, headers)
+    return match_details
 
 def extract_player_champ_info(match_details, puuid):
     participants = match_details.get('info', {}).get('participants', [])
@@ -81,17 +73,8 @@ def get_player_mastery(puuid, riot_api_key):
         "Accept": "application/json",
         "User-Agent": "LeagueHelperApp/1.0"
     }
-    try:
-        response = requests.get(api_url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            mastery_info = response.json()
-            return mastery_info
-        else:
-            print(f"Error: {response.status_code} - {response.text}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-        return None
+    mastery_info = call_riot_api(api_url, headers)
+    return mastery_info
     
 def collect_league_data(RIOT_API_KEY, game_name, tag_line):
     player_info = []
@@ -110,41 +93,48 @@ def collect_league_data(RIOT_API_KEY, game_name, tag_line):
     })
     return player_info
 
-def print_info_to_sheets(worksheet_string, sh, player_info):
+def print_info_to_sheets(worksheet_string, sh, player_info, column_number=1):
     worksheet = sh.worksheet(worksheet_string)
     #set header
-    worksheet.update_cell(1,1, player_info[0]["game_name"])
+    worksheet.update_cell(1,column_number, player_info[0]["game_name"])
     #fill in data
     i = 2
     for champ in player_info[0]["sorted_champions_played"]:
-        worksheet.update_cell(i, 1, champ)
+        worksheet.update_cell(i, column_number, champ)
         i += 1
     
 def main():
     load_dotenv()
     RIOT_API_KEY = os.getenv("RIOT_API_KEY")
-    print("Please input player information, format example: Game Name: frenzy, Tag Line: aja, for riotid frenzy#aja")
-    game_name = input("Game Name: ",)
-    tag_line = input("Tag Line: ",)
-    player_info = collect_league_data(RIOT_API_KEY, game_name, tag_line)
+    #google sheets verification
+    # gc = gspread.service_account(filename='credentials.json')
+    # try:
+    #     #this key determines which sheet is opened
+    #     sh = gc.open_by_key("1wp9h_LorMKCMWHLCfBOjq8WlZUuw2mgYlUqnJv7GeXY")
+    # except gspread.SpreadsheetNotFound:
+    #     print("Error: Spreadsheet not found")
+    #     exit(1)
+    #list of riot IDs to process
+    riot_ids = [
+        ("frenzy","aja"), 
+        ("Doug105","0000"),
+        ("Stickb0y99","SM99"),
+        ("Nightske","#NA1"),
+        ("aspect of banana","#int")
+        ]
     
-    #google sheets integration here
-    gc = gspread.service_account(filename='credentials.json')
-    try:
-        #this key determines which sheet is opened
-        sh = gc.open_by_key("1wp9h_LorMKCMWHLCfBOjq8WlZUuw2mgYlUqnJv7GeXY")
-    except gspread.SpreadsheetNotFound:
-        print("Error: Spreadsheet not found")
-        exit(1)
-    print_info_to_sheets("Sheet5", sh, player_info)
-    
+    #processing each riot ID
+    # i = 1
+    # for riot_id in riot_ids:
+    #     player_info = collect_league_data(RIOT_API_KEY, riot_id[0], riot_id[1])
+    #     print_info_to_sheets("Sheet5", sh, player_info, i)
+    #     i += 1
+    #     time.sleep(130)  # seconds
 
-    #match_details = get_match_details(recent_matches[0], RIOT_API_KEY)
-    #champion_name = extract_player_info(match_details, puuid)
-    #print(f"PUUID: {puuid}")
-    #print(f"Recent Matches: {recent_matches}")
-    #print(f"Match Details for Match ID {recent_matches[0]}: {match_details}")
-    #print (f"Champion played {champion_name}")
+    bot_startup()
+
+
+
 
 if __name__ == "__main__":
     main()
