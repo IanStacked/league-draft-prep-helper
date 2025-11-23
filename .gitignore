@@ -11,4 +11,5 @@ wheels/
 
 # Enviroment files
 credentials.json
+serviceAccountKey.json
 .env
