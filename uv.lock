@@ -813,7 +813,6 @@ dependencies = [
     { name = "gspread" },
     { name = "python-dotenv" },
     { name = "ratelimit" },
-    { name = "requests" },
 ]
 
 [package.metadata]
@@ -824,7 +823,6 @@ requires-dist = [
     { name = "gspread", specifier = ">=6.2.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "ratelimit", specifier = ">=2.2.1" },
-    { name = "requests", specifier = ">=2.32.5" },
 ]
 
 [[package]]
