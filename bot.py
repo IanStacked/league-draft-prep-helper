@@ -88,7 +88,7 @@ async def track(ctx, *, riot_id):
         return await ctx.send("Invalid input, please ensure syntax is: !track username#tagline")
     username = parsed[0]
     tagline = parsed[1]
-    doc_id = f"{username}#{tagline}"
+    doc_id = f"{username}#{tagline}" 
     #API handling
     puuid = await get_puuid(bot.session, username, tagline, RIOT_API_KEY)
     if not puuid:
@@ -113,7 +113,44 @@ async def track(ctx, *, riot_id):
         print(f"Error tracking: {e}")
         await ctx.send("Database write failed.")
         raise e
-    
+
+@bot.command(name="untrack", help="Removes player from list of players tracked by bot given riotid")
+async def untrack(ctx, *, riot_id):
+    if db is None:
+        return await ctx.send("Database Error")
+    parsed = parse_riot_id(riot_id)
+    if not parsed:
+        return await ctx.send("Invalid input, please ensure syntax is: !untrack username#tagline")
+    username = parsed[0]
+    tagline = parsed[1]
+    doc_id = f"{username}#{tagline}" 
+    #DB handling
+    guild_id_str = str(ctx.guild.id)
+    doc_ref = db.collection(TRACKED_USERS_COLLECTION).document(doc_id)
+    try:
+        #READ
+        doc = doc_ref.get()
+        if not doc.exists:
+            return await ctx.send(f"{doc_id} is not in the database.")
+        data = doc.to_dict()
+        guild_list = data.get("guild_ids",[])
+        if guild_id_str not in guild_list:
+            return await ctx.send(f"{doc_id} is not being tracked in this server.")
+        #LOGIC
+        guild_list.remove(guild_id_str)
+        if not guild_list:
+            #We were the only server left, delete whole file
+            doc_ref.delete()
+            await ctx.send(f"{doc_id} is no longer tracked")
+        else:
+            data["guild_ids"] = guild_list
+            del data[f"server_info.{guild_id_str}"]
+            doc_ref.set(data)
+            await ctx.send(f"{doc_id} is no longer tracked")
+    except Exception as e:
+        print(f"Error untracking: {e}")
+        await ctx.send("Database update failed")
+        
 # Helper Functions
 def parse_riot_id(unclean_riot_id):
     clean_riot_id = unclean_riot_id.strip()
@@ -124,7 +161,7 @@ def parse_riot_id(unclean_riot_id):
     tagline = parts[1]
     if not username or not tagline:
         return None
-    return (username,tagline.lower())
+    return (username,tagline.lower()) #tagline.lower() because taglines are not case sensitive, this gaurentees we dont handle the same riotid differently
         
 
 def bot_startup():
