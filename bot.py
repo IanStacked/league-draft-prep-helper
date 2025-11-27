@@ -17,6 +17,22 @@ load_dotenv()
 DISCORD_KEY = os.getenv("DISCORD_PUBLIC_KEY")
 RIOT_API_KEY = os.getenv("RIOT_API_KEY")
 
+#Sorting Helpers
+TIER_ORDER = {
+    "CHALLENGER": 9, 
+    "GRANDMASTER": 8, 
+    "MASTER": 7, 
+    "DIAMOND": 6, 
+    "EMERALD": 5, 
+    "PLATINUM": 4, 
+    "GOLD": 3, 
+    "SILVER": 2, 
+    "BRONZE": 1, 
+    "IRON": 0,
+    "UNRANKED": -1
+}
+RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
+
 # Database Startup
 db = database_startup()
 
@@ -169,7 +185,55 @@ async def update(ctx):
         doc.reference.update(data)
         #update ranked information of tracked users
     return await ctx.send("Ranked stats updated for all tracked users!")
-        
+
+@bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
+async def leaderboard(ctx):
+    if db is None:
+        return await ctx.send("Database Error")
+    guild_id_str = str(ctx.guild.id)
+    #DB handling
+    docs = db.collection(TRACKED_USERS_COLLECTION)\
+                 .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
+                 .stream()
+    doc_list = list(docs)
+    if not doc_list:
+        return await ctx.send("No users tracked in this server. Use !track.")
+    leaderboard_data = []
+    for doc in doc_list:
+        data = doc.to_dict()
+        leaderboard_data.append({
+            "name": data.get("riot_id"),
+            "tier": data.get("tier", "UNRANKED"), # Default to UNRANKED if missing
+            "rank": data.get("rank", ""),
+            "lp": data.get("LP", 0) # Use 0 if missing
+        })
+    # 3. The Sorting Logic (Crucial Step)
+    # We sort by Tuple: (Tier Value, Rank Value, LP Value)
+    # reverse=True means we want the HIGHEST score at the top
+    leaderboard_data.sort(key=lambda x: (
+        TIER_ORDER.get(x["tier"].upper(), -1), # Get integer value of Tier
+        RANK_ORDER.get(x["rank"], 0),          # Get integer value of Rank
+        x["lp"]                                # Raw LP integer
+    ), reverse=True)
+
+    # 4. Format the Message
+    # Using an Embed looks much nicer for leaderboards!
+    embed = discord.Embed(title=f"🏆 Leaderboard for {ctx.guild.name}", color=discord.Color.gold())
+    
+    description = ""
+    for i, player in enumerate(leaderboard_data, 1):
+        # Add emojis for top 3
+        if i == 1: rank_prefix = "🥇"
+        elif i == 2: rank_prefix = "🥈"
+        elif i == 3: rank_prefix = "🥉"
+        else: rank_prefix = f"**{i}.**"
+
+        # Format: "1. Ninja#NA1 - GOLD IV (50 LP)"
+        description += f"{rank_prefix} **{player['name']}** - {player['tier']} {player['rank']} ({player['lp']} LP)\n"
+
+    embed.description = description
+    await ctx.send(embed=embed)
+
 # Helper Functions
 def parse_riot_id(unclean_riot_id):
     clean_riot_id = unclean_riot_id.strip()
