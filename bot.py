@@ -4,12 +4,13 @@ import aiohttp
 from dotenv import load_dotenv
 from discord.ext import commands
 from firebase_admin import firestore
+from google.cloud.firestore import FieldFilter
 
 # Self Contained Imports
 from database import database_startup
 from database import TRACKED_USERS_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
-from utils import get_puuid
+from utils import get_puuid, get_ranked_info
 
 # API Keys
 load_dotenv()
@@ -150,6 +151,24 @@ async def untrack(ctx, *, riot_id):
     except Exception as e:
         print(f"Error untracking: {e}")
         await ctx.send("Database update failed")
+
+@bot.command(name="update", help="Updates ranked information of tracked users")
+async def update(ctx):
+    if db is None:
+        return await ctx.send("Database Error")
+    guild_id_str = str(ctx.guild.id)
+    #DB handling
+    docs = db.collection(TRACKED_USERS_COLLECTION)\
+                 .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
+                 .stream()
+    doc_list = list(docs)
+    if not doc_list:
+        return await ctx.send("No users tracked in this server. Use !track.")
+    for doc in doc_list:
+        data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+        doc.reference.update(data)
+        #update ranked information of tracked users
+    return await ctx.send("Ranked stats updated for all tracked users!")
         
 # Helper Functions
 def parse_riot_id(unclean_riot_id):

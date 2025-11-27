@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 from collections import Counter
 
 # Custom Exceptions
@@ -16,29 +17,37 @@ class RateLimitError(RiotAPIError):
 
 # Core API Function
 
-async def call_riot_api(session, url, headers):
-    try:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                return await response.json()
-            elif response.status == 404:
-                # 404 usually means data/user not found
-                return None 
-            elif response.status == 429:
-                raise RateLimitError("Riot API Rate Limit Exceeded.")
-            elif response.status == 403:
-                raise RiotAPIError("Riot API Key is invalid or expired.")
-            else:
-                raise RiotAPIError(f"Riot API Error {response.status}: {url}")
-    except aiohttp.ClientError as e:
-        raise RiotAPIError(f"Network Connection Failed: {e}")
+async def call_riot_api(session, url, headers, retries=3):
+    for attempt in range(retries):
+        try:
+            async with session.get(url, headers=headers) as response:
+                #Success
+                if response.status == 200:
+                    return await response.json()
+                #Rate Limit Hit
+                elif response.status == 429:
+                    retry_after = int(response.headers.get("Retry-After",1))
+                    print(f"⚠️ Rate Limit Hit! Sleeping for {retry_after} seconds...")
+                    await asyncio.sleep(retry_after)
+                    continue
+                #Other errors - dont retry
+                elif response.status == 404:
+                    # 404 usually means data/user not found
+                    return None 
+                elif response.status == 403:
+                    raise RiotAPIError("Riot API Key is invalid or expired.")
+                else:
+                    raise RiotAPIError(f"Riot API Error {response.status}: {url}")
+        except aiohttp.ClientError as e:
+            raise RiotAPIError(f"Network Connection Failed: {e}")
+    raise RateLimitError("Max retries exceeded for Riot API.")
     
 # Specific Data Fetchers
 
-async def get_puuid(session, game_name, tag_line, riot_api_key):
+async def get_puuid(session, game_name, tag_line, RIOT_API_KEY):
     api_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
     headers = {
-        "X-Riot-Token": riot_api_key,
+        "X-Riot-Token": RIOT_API_KEY,
         "Accept": "application/json",
         "User-Agent": "LeagueHelperApp/1.0"
     }
@@ -46,7 +55,36 @@ async def get_puuid(session, game_name, tag_line, riot_api_key):
     if data is None:
         raise UserNotFound(f"User {game_name}#{tag_line} not found.")
     return data.get("puuid")
-    
+
+async def get_ranked_info(session, puuid, RIOT_API_KEY):
+    # League-V4 MUST use a specific region like 'na1', 'euw1', 'kr'
+    api_url = f"https://na1.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}"
+    headers = {
+        "X-Riot-Token": RIOT_API_KEY,
+        "Accept": "application/json",
+        "User-Agent": "LeagueHelperApp/1.0"
+    }
+    data = await call_riot_api(session, api_url, headers)
+    if data is None:
+        raise UserNotFound(f"User with puuid: {puuid} not found.")
+    soloq = None
+    for entry in data:
+        if entry.get("queueType") == "RANKED_SOLO_5x5":
+            soloq = entry
+            break
+    if soloq:
+        return {
+        "tier": soloq.get("tier"),
+        "rank": soloq.get("rank"),
+        "LP": soloq.get("leaguePoints")
+        }
+    else:
+        return {
+        "tier": "",
+        "rank": "Unranked",
+        "LP": 0
+        }
+
 # def get_puuid(game_name, tag_line, riot_api_key):
 #     api_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
 #     headers = {
