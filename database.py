@@ -4,6 +4,7 @@ from firebase_admin import firestore
 
 # Configuration
 TRACKED_USERS_COLLECTION = "tracked_users"
+GUILD_CONFIG_COLLECTION = "guild_config"
 
 def database_startup():
     """

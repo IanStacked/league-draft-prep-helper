@@ -2,22 +2,24 @@ import discord
 import os
 import aiohttp
 from dotenv import load_dotenv
-from discord.ext import commands
+from discord.ext import commands, tasks
 from firebase_admin import firestore
 from google.cloud.firestore import FieldFilter
 
 # Self Contained Imports
 from database import database_startup
-from database import TRACKED_USERS_COLLECTION
+from database import TRACKED_USERS_COLLECTION, GUILD_CONFIG_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
 from utils import get_puuid, get_ranked_info
 
 # API Keys
+
 load_dotenv()
 DISCORD_KEY = os.getenv("DISCORD_PUBLIC_KEY")
 RIOT_API_KEY = os.getenv("RIOT_API_KEY")
 
 #Sorting Helpers
+
 TIER_ORDER = {
     "CHALLENGER": 9, 
     "GRANDMASTER": 8, 
@@ -34,9 +36,11 @@ TIER_ORDER = {
 RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
 
 # Database Startup
+
 db = database_startup()
 
 # Bot Startup
+
 BOT_PREFIX = "!"
 class MyBot(commands.Bot):
     def __init__(self):
@@ -50,6 +54,9 @@ class MyBot(commands.Bot):
         #Runs once when the bot starts up.
         self.session = aiohttp.ClientSession()
         print("✅ Persistent HTTP Session created.")
+        if not self.background_update_task.is_running():
+            self.background_update_task.start()
+            print("✅ Background update task started.")
     async def close(self):
         #Runs when the bot shuts down.
         if self.session:
@@ -61,8 +68,6 @@ class MyBot(commands.Bot):
                     .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
                     .stream()
         doc_list = list(docs)
-        if not channel:
-            return await channel.send("Please set the designated channel you want updates to go to. Use !setupdatechannel")
         if not doc_list:
             return await channel.send("No users tracked in this server. Use !track.")
         for doc in doc_list:
@@ -75,6 +80,8 @@ class MyBot(commands.Bot):
             new_lp = data.get("LP")
             doc.reference.update(data)
             #message handling
+            if not channel:
+                continue
             if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
                 continue
             embed = discord.Embed(title = "Rank Update", color = discord.Color.purple())
@@ -91,11 +98,36 @@ class MyBot(commands.Bot):
             elif(old_lp < new_lp):
                 embed.description = f"{doc.get("riot_id")} gained {new_lp - old_lp} LP"
             await channel.send(embed=embed)
-        return await channel.send("Ranked stats updated for all tracked users!")
+    
+    # Background Task
+
+    @tasks.loop(minutes=10)
+    async def background_update_task(self):
+        if not self.guilds:
+            print("[PROCESS] Still loading caches, backgrund update loop delayed.")
+            return
+        print("[PROCESS] Starting background update loop")
+        for guild in self.guilds:
+            guild_id_str = str(guild.id)
+            channel = None
+            try:
+                config_ref = db.collection(GUILD_CONFIG_COLLECTION).document(guild_id_str)
+                config = config_ref.get()
+                if config.exists:
+                    channel_id = config.get("channel_id")
+                    channel = self.get_channel(channel_id)
+            except Exception as e:
+                print(f"Error fetching config for guild {guild.name}: {e}")
+            await self.process_rank_updates(channel, guild_id_str)
+    
+    @background_update_task.before_loop
+    async def before_background_task(self):
+        await self.wait_until_ready()
 
 bot = MyBot()
 
 # Event Handlers
+
 @bot.event
 async def on_ready():
     #called when bot initially connects
@@ -104,6 +136,7 @@ async def on_ready():
         print("WARNING: Database is not connected")
 
 # Global Error Handler
+
 @bot.event
 async def on_command_error(ctx, error):
     # Command not found
@@ -127,6 +160,7 @@ async def on_command_error(ctx, error):
         print(f"Error: {error}")
 
 # Command Definitions
+
 @bot.command(name="hello", help="Greets the user back.")
 async def hello(ctx):
     user_name = ctx.author.display_name
@@ -203,7 +237,7 @@ async def untrack(ctx, *, riot_id):
         print(f"Error untracking: {e}")
         await ctx.send("Database update failed")
 
-@bot.command(name="update", help="Updates ranked information of tracked users")
+@bot.command(name="update", help="Manually updates ranked information of tracked users")
 async def update(ctx):
     if db is None:
         return await ctx.send("Database Error")
@@ -258,7 +292,23 @@ async def leaderboard(ctx):
     embed.description = description
     await ctx.send(embed=embed)
 
+@bot.command(name="updateshere", help="Defaults rank updates to wherever this command is used")
+async def set_update_channel(ctx):
+    if db is None:
+        return await ctx.send("Database Error")
+    doc_ref = db.collection(GUILD_CONFIG_COLLECTION).document(str(ctx.guild.id))
+    try:
+        doc_ref.set({
+            "channel_id": ctx.channel.id
+        }, merge=True)
+        await ctx.send("Rank updates will now be posted in this channel")
+    except Exception as e:
+        print(f"Error setting guild config: {e}")
+        await ctx.send("Database write failed.")
+        raise e
+
 # Helper Functions
+
 def parse_riot_id(unclean_riot_id):
     clean_riot_id = unclean_riot_id.strip()
     if "#" not in clean_riot_id:
