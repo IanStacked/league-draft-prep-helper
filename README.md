@@ -1,3 +1,3 @@
-# League of Legends draft preparation helper
-Interacts with riot API and google sheets api to generate player information used in draft prep.
+# League of Legends discord bot
+Interacts with Riot's API to generate a leaderboard and provide user ranked updates for users tracked by the bot
 
