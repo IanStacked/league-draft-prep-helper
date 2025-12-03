@@ -80,8 +80,8 @@ async def get_ranked_info(session, puuid, RIOT_API_KEY):
         }
     else:
         return {
-        "tier": "",
-        "rank": "Unranked",
+        "tier": "UNRANKED",
+        "rank": "",
         "LP": 0
         }
 

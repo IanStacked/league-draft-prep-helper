@@ -56,6 +56,42 @@ class MyBot(commands.Bot):
             await self.session.close()
             print("🛑 HTTP Session closed.")
         await super().close()
+    async def process_rank_updates(self, channel, guild_id_str):
+        docs = db.collection(TRACKED_USERS_COLLECTION)\
+                    .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
+                    .stream()
+        doc_list = list(docs)
+        if not channel:
+            return await channel.send("Please set the designated channel you want updates to go to. Use !setupdatechannel")
+        if not doc_list:
+            return await channel.send("No users tracked in this server. Use !track.")
+        for doc in doc_list:
+            old_tier = doc.get("tier")
+            old_rank = doc.get("rank")
+            old_lp = doc.get("LP")
+            data = await get_ranked_info(self.session, doc.get("puuid"), RIOT_API_KEY)
+            new_tier = data.get("tier")
+            new_rank = data.get("rank")
+            new_lp = data.get("LP")
+            doc.reference.update(data)
+            #message handling
+            if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
+                continue
+            embed = discord.Embed(title = "Rank Update", color = discord.Color.purple())
+            if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
+                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_tier} to {new_tier}"
+            elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
+                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_tier} to {new_tier}"
+            elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
+                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}"
+            elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
+                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}"
+            elif(old_lp > new_lp):
+                embed.description = f"{doc.get("riot_id")} lost {old_lp - new_lp} LP"
+            elif(old_lp < new_lp):
+                embed.description = f"{doc.get("riot_id")} gained {new_lp - old_lp} LP"
+            await channel.send(embed=embed)
+        return await channel.send("Ranked stats updated for all tracked users!")
 
 bot = MyBot()
 
@@ -108,18 +144,17 @@ async def track(ctx, *, riot_id):
     doc_id = f"{username}#{tagline}" 
     #API handling
     puuid = await get_puuid(bot.session, username, tagline, RIOT_API_KEY)
-    if not puuid:
-        return
     #DB handling
     guild_id_str = str(ctx.guild.id)
     doc_ref = db.collection(TRACKED_USERS_COLLECTION).document(doc_id)
+    ranked_data = await get_ranked_info(bot.session, puuid, RIOT_API_KEY)
     try:
         doc_ref.set({
             "riot_id": f"{username}#{tagline}",
             "puuid": puuid,
-            "tier": "",
-            "rank": "",
-            "LP": 0,
+            "tier": f"{ranked_data.get("tier")}",
+            "rank": f"{ranked_data.get("rank")}",
+            "LP": ranked_data.get("LP"),
             "guild_ids": firestore.ArrayUnion([guild_id_str]),
             f"server_info.{guild_id_str}": {
                 "added_by": ctx.author.id
@@ -173,35 +208,7 @@ async def update(ctx):
     if db is None:
         return await ctx.send("Database Error")
     guild_id_str = str(ctx.guild.id)
-    #DB handling
-    docs = db.collection(TRACKED_USERS_COLLECTION)\
-                 .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
-                 .stream()
-    doc_list = list(docs)
-    if not doc_list:
-        return await ctx.send("No users tracked in this server. Use !track.")
-    for doc in doc_list:
-        old_tier = doc.get("tier")
-        old_rank = doc.get("rank")
-        old_lp = doc.get("LP")
-        data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
-        new_tier = data.get("tier")
-        new_rank = data.get("rank")
-        new_lp = data.get("LP")
-        doc.reference.update(data)
-        if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
-            await ctx.send(f"{doc.get("riot_id")} has DEMOTED from {old_tier} to {new_tier}")
-        elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
-            await ctx.send(f"{doc.get("riot_id")} has PROMOTED from {old_tier} to {new_tier}")
-        elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
-            await ctx.send(f"{doc.get("riot_id")} has DEMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}")
-        elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
-            await ctx.send(f"{doc.get("riot_id")} has PROMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}")
-        elif(old_lp > new_lp):
-            await ctx.send(f"{doc.get("riot_id")} lost {old_lp - new_lp} LP")
-        elif(old_lp < new_lp):
-            await ctx.send(f"{doc.get("riot_id")} gained {new_lp - old_lp} LP")
-    return await ctx.send("Ranked stats updated for all tracked users!")
+    return await bot.process_rank_updates(ctx.channel, guild_id_str)
 
 @bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
 async def leaderboard(ctx):
