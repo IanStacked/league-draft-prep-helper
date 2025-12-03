@@ -181,9 +181,26 @@ async def update(ctx):
     if not doc_list:
         return await ctx.send("No users tracked in this server. Use !track.")
     for doc in doc_list:
+        old_tier = doc.get("tier")
+        old_rank = doc.get("rank")
+        old_lp = doc.get("LP")
         data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+        new_tier = data.get("tier")
+        new_rank = data.get("rank")
+        new_lp = data.get("LP")
         doc.reference.update(data)
-        #update ranked information of tracked users
+        if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
+            await ctx.send(f"{doc.get("riot_id")} has DEMOTED from {old_tier} to {new_tier}")
+        elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
+            await ctx.send(f"{doc.get("riot_id")} has PROMOTED from {old_tier} to {new_tier}")
+        elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
+            await ctx.send(f"{doc.get("riot_id")} has DEMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}")
+        elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
+            await ctx.send(f"{doc.get("riot_id")} has PROMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}")
+        elif(old_lp > new_lp):
+            await ctx.send(f"{doc.get("riot_id")} lost {old_lp - new_lp} LP")
+        elif(old_lp < new_lp):
+            await ctx.send(f"{doc.get("riot_id")} gained {new_lp - old_lp} LP")
     return await ctx.send("Ranked stats updated for all tracked users!")
 
 @bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
@@ -254,5 +271,3 @@ def bot_startup():
         print("\n[ERROR] Invalid Token detected. Please check your DISCORD_TOKEN.")
     except Exception as e:
         print(f"\n[ERROR] An error occurred while running the bot: {e}")
-
-
