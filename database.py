@@ -3,15 +3,11 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 
 # Configuration
+
 TRACKED_USERS_COLLECTION = "tracked_users"
 GUILD_CONFIG_COLLECTION = "guild_config"
 
 def database_startup():
-    """
-    Connects to Firestore using the serviceAccountKey.json file.
-    Returns the database client instance.
-    """
-    # Check if Firebase is already initialized to avoid errors on reload
     if not firebase_admin._apps:
         try:
             cred = credentials.Certificate("serviceAccountKey.json")
@@ -23,5 +19,4 @@ def database_startup():
         except Exception as e:
             print(f"❌ ERROR initializing Firebase: {e}")
             return None
-    
     return firestore.client()

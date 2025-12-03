@@ -7,6 +7,7 @@ from firebase_admin import firestore
 from google.cloud.firestore import FieldFilter
 
 # Self Contained Imports
+
 from database import database_startup
 from database import TRACKED_USERS_COLLECTION, GUILD_CONFIG_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
@@ -50,19 +51,22 @@ class MyBot(commands.Bot):
         intents.guilds = True
         super().__init__(command_prefix=BOT_PREFIX, intents=intents)
         self.session = None #placeholder
+
     async def setup_hook(self):
-        #Runs once when the bot starts up.
+        #runs when the bot starts up.
         self.session = aiohttp.ClientSession()
         print("✅ Persistent HTTP Session created.")
         if not self.background_update_task.is_running():
             self.background_update_task.start()
             print("✅ Background update task started.")
+
     async def close(self):
-        #Runs when the bot shuts down.
+        #runs when the bot shuts down.
         if self.session:
             await self.session.close()
             print("🛑 HTTP Session closed.")
         await super().close()
+
     async def process_rank_updates(self, channel, guild_id_str):
         docs = db.collection(TRACKED_USERS_COLLECTION)\
                     .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
@@ -139,10 +143,8 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    # Command not found
     if isinstance(error, commands.CommandNotFound):
         await ctx.send("Sorry, I don't know that command")
-    # Missing arguments
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"Missing arguments. Usage: '{ctx.command.signature}'")
     elif isinstance(error, commands.CommandInvokeError):
@@ -214,7 +216,6 @@ async def untrack(ctx, *, riot_id):
     guild_id_str = str(ctx.guild.id)
     doc_ref = db.collection(TRACKED_USERS_COLLECTION).document(doc_id)
     try:
-        #READ
         doc = doc_ref.get()
         if not doc.exists:
             return await ctx.send(f"{doc_id} is not in the database.")
@@ -222,10 +223,9 @@ async def untrack(ctx, *, riot_id):
         guild_list = data.get("guild_ids",[])
         if guild_id_str not in guild_list:
             return await ctx.send(f"{doc_id} is not being tracked in this server.")
-        #LOGIC
         guild_list.remove(guild_id_str)
         if not guild_list:
-            #We were the only server left, delete whole file
+            #we are the only server left, delete the whole file
             doc_ref.delete()
             await ctx.send(f"{doc_id} is no longer tracked")
         else:
@@ -261,34 +261,23 @@ async def leaderboard(ctx):
         data = doc.to_dict()
         leaderboard_data.append({
             "name": data.get("riot_id"),
-            "tier": data.get("tier", "UNRANKED"), # Default to UNRANKED if missing
+            "tier": data.get("tier", "UNRANKED"), 
             "rank": data.get("rank", ""),
-            "lp": data.get("LP", 0) # Use 0 if missing
+            "lp": data.get("LP", 0) 
         })
-    # 3. The Sorting Logic (Crucial Step)
-    # We sort by Tuple: (Tier Value, Rank Value, LP Value)
-    # reverse=True means we want the HIGHEST score at the top
     leaderboard_data.sort(key=lambda x: (
-        TIER_ORDER.get(x["tier"].upper(), -1), # Get integer value of Tier
-        RANK_ORDER.get(x["rank"], 0),          # Get integer value of Rank
-        x["lp"]                                # Raw LP integer
+        TIER_ORDER.get(x["tier"].upper(), -1), 
+        RANK_ORDER.get(x["rank"], 0),          
+        x["lp"]                                
     ), reverse=True)
-
-    # 4. Format the Message
-    # Using an Embed looks much nicer for leaderboards!
     embed = discord.Embed(title=f"🏆 Leaderboard for {ctx.guild.name}", color=discord.Color.gold())
-    
     description = ""
     for i, player in enumerate(leaderboard_data, 1):
-        # Add emojis for top 3
         if i == 1: rank_prefix = "🥇"
         elif i == 2: rank_prefix = "🥈"
         elif i == 3: rank_prefix = "🥉"
         else: rank_prefix = f"**{i}.**"
-
-        # Format: "1. Ninja#NA1 - GOLD IV (50 LP)"
         description += f"{rank_prefix} **{player['name']}** - {player['tier']} {player['rank']} ({player['lp']} LP)\n"
-
     embed.description = description
     await ctx.send(embed=embed)
 
