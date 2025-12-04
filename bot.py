@@ -242,7 +242,8 @@ async def update(ctx):
     if db is None:
         return await ctx.send("Database Error")
     guild_id_str = str(ctx.guild.id)
-    return await bot.process_rank_updates(ctx.channel, guild_id_str)
+    await bot.process_rank_updates(ctx.channel, guild_id_str)
+    return await ctx.send("Ranked information has been updated")
 
 @bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
 async def leaderboard(ctx):
