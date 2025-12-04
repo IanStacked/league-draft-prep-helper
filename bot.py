@@ -94,9 +94,9 @@ class MyBot(commands.Bot):
             elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
                 embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_tier} to {new_tier}"
             elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
-                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}"
+                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
             elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
-                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_rank} {old_tier} to {new_rank} {new_tier}"
+                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
             elif(old_lp > new_lp):
                 embed.description = f"{doc.get("riot_id")} lost {old_lp - new_lp} LP"
             elif(old_lp < new_lp):
