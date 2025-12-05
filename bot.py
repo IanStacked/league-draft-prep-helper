@@ -282,7 +282,7 @@ async def leaderboard(ctx):
     embed.description = description
     await ctx.send(embed=embed)
 
-@bot.command(name="updateshere", help="Defaults rank updates to wherever this command is used")
+@bot.command(name="updateshere", help="Defaults rank updates to post in the channel wherever this command is used [NOTE]: If this command is not used, by default the bot will simply not post live ranked updates")
 async def set_update_channel(ctx):
     if db is None:
         return await ctx.send("Database Error")
