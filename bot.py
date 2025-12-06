@@ -72,8 +72,11 @@ class MyBot(commands.Bot):
                     .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
                     .stream()
         doc_list = list(docs)
-        if not doc_list:
+        if not doc_list and channel:
             return await channel.send("No users tracked in this server. Use !track.")
+            #this covers the case where someone calls !update manually
+        if not doc_list:
+            return
         for doc in doc_list:
             old_tier = doc.get("tier")
             old_rank = doc.get("rank")
