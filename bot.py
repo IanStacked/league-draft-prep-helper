@@ -302,6 +302,25 @@ async def set_update_channel(ctx):
 
 # Helper Functions
 
+def create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id):
+    embed = discord.Embed(title = "Rank Update", color = discord.Color.purple())
+    if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
+        embed.description = f"{riot_id} has DEMOTED from {old_tier} to {new_tier}"
+    elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
+        embed.description = f"{riot_id} has PROMOTED from {old_tier} to {new_tier}"
+    elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
+        embed.description = f"{riot_id} has DEMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
+    elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
+        embed.description = f"{riot_id} has PROMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
+    elif(old_lp > new_lp):
+        embed.description = f"{riot_id} lost {old_lp - new_lp} LP"
+    elif(old_lp < new_lp):
+        embed.description = f"{riot_id} gained {new_lp - old_lp} LP"
+    else:
+        #this case only happens when both old and new ranked information are identical
+        embed.description = "This update should not have happened, WHOOPS!"
+    return embed
+
 def parse_riot_id(unclean_riot_id):
     clean_riot_id = unclean_riot_id.strip()
     if "#" not in clean_riot_id:
