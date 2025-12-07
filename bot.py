@@ -66,66 +66,40 @@ class MyBot(commands.Bot):
             await self.session.close()
             print("🛑 HTTP Session closed.")
         await super().close()
-
-    async def process_rank_updates(self, channel, guild_id_str):
-        docs = db.collection(TRACKED_USERS_COLLECTION)\
-                    .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
-                    .stream()
-        doc_list = list(docs)
-        if not doc_list and channel:
-            return await channel.send("No users tracked in this server. Use !track.")
-            #this covers the case where someone calls !update manually
-        if not doc_list:
-            return
-        for doc in doc_list:
-            old_tier = doc.get("tier")
-            old_rank = doc.get("rank")
-            old_lp = doc.get("LP")
-            data = await get_ranked_info(self.session, doc.get("puuid"), RIOT_API_KEY)
-            new_tier = data.get("tier")
-            new_rank = data.get("rank")
-            new_lp = data.get("LP")
-            doc.reference.update(data)
-            #message handling
-            if not channel:
-                continue
-            if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
-                continue
-            embed = discord.Embed(title = "Rank Update", color = discord.Color.purple())
-            if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
-                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_tier} to {new_tier}"
-            elif(TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier)):
-                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_tier} to {new_tier}"
-            elif(RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank)):
-                embed.description = f"{doc.get("riot_id")} has DEMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
-            elif(RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank)):
-                embed.description = f"{doc.get("riot_id")} has PROMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
-            elif(old_lp > new_lp):
-                embed.description = f"{doc.get("riot_id")} lost {old_lp - new_lp} LP"
-            elif(old_lp < new_lp):
-                embed.description = f"{doc.get("riot_id")} gained {new_lp - old_lp} LP"
-            await channel.send(embed=embed)
     
     # Background Task
 
     @tasks.loop(minutes=10)
     async def background_update_task(self):
-        if not self.guilds:
-            print("[PROCESS] Still loading caches, backgrund update loop delayed.")
-            return
         print("[PROCESS] Starting background update loop")
-        for guild in self.guilds:
-            guild_id_str = str(guild.id)
-            channel = None
-            try:
-                config_ref = db.collection(GUILD_CONFIG_COLLECTION).document(guild_id_str)
-                config = config_ref.get()
-                if config.exists:
-                    channel_id = config.get("channel_id")
-                    channel = self.get_channel(channel_id)
-            except Exception as e:
-                print(f"Error fetching config for guild {guild.name}: {e}")
-            await self.process_rank_updates(channel, guild_id_str)
+        docs = db.collection(TRACKED_USERS_COLLECTION).stream()
+        doc_list = list(docs)
+        for doc in doc_list:
+            old_tier = doc.get("tier")
+            old_rank = doc.get("rank")
+            old_lp = doc.get("LP")
+            data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+            new_tier = data.get("tier")
+            new_rank = data.get("rank")
+            new_lp = data.get("LP")
+            doc.reference.update(data)
+            if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
+                continue
+            guild_ids = doc.get("guild_ids")
+            for guild in guild_ids:
+                channel = None
+                try:
+                    config_ref = db.collection(GUILD_CONFIG_COLLECTION).document(guild)
+                    config = config_ref.get()
+                    if config.exists:
+                        channel_id = config.get("channel_id")
+                        channel = bot.get_channel(channel_id)
+                except Exception as e:
+                    print(f"Error fetching config for guild {guild}: {e}")
+                if channel:
+                    riot_id = doc.get("riot_id")
+                    embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id)
+                    await channel.send(embed=embed)
     
     @background_update_task.before_loop
     async def before_background_task(self):
