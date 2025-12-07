@@ -245,7 +245,27 @@ async def update(ctx):
     if db is None:
         return await ctx.send("Database Error")
     guild_id_str = str(ctx.guild.id)
-    await bot.process_rank_updates(ctx.channel, guild_id_str)
+    docs = db.collection(TRACKED_USERS_COLLECTION)\
+                .where(filter=FieldFilter("guild_ids", "array_contains", guild_id_str))\
+                .stream()
+    doc_list = list(docs)
+    if not doc_list:
+        return await ctx.send("No users tracked in this server. Use !track.")
+    for doc in doc_list:
+        old_tier = doc.get("tier")
+        old_rank = doc.get("rank")
+        old_lp = doc.get("LP")
+        data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+        new_tier = data.get("tier")
+        new_rank = data.get("rank")
+        new_lp = data.get("LP")
+        doc.reference.update(data)
+        #message handling
+        if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
+            continue
+        riot_id = doc.get("riot_id")
+        embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id)
+        await ctx.send(embed=embed)
     return await ctx.send("Ranked information has been updated")
 
 @bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
