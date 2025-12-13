@@ -81,3 +81,16 @@ async def get_ranked_info(session, puuid, RIOT_API_KEY):
         "rank": "",
         "LP": 0
         }
+    
+# Helper Functions
+
+def parse_riot_id(unclean_riot_id):
+    clean_riot_id = unclean_riot_id.strip()
+    if "#" not in clean_riot_id:
+        return None
+    parts = clean_riot_id.split("#",1)
+    username = parts[0]
+    tagline = parts[1]
+    if not username or not tagline:
+        return None
+    return (username,tagline.lower()) #tagline.lower() because taglines are not case sensitive, this gaurentees we dont handle the same riotid differently

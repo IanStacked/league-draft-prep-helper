@@ -11,7 +11,7 @@ from google.cloud.firestore import FieldFilter
 from database import database_startup
 from database import TRACKED_USERS_COLLECTION, GUILD_CONFIG_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
-from utils import get_puuid, get_ranked_info
+from utils import get_puuid, get_ranked_info, parse_riot_id
 
 # API Keys
 
@@ -313,19 +313,7 @@ def create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_
     else:
         #this case only happens when both old and new ranked information are identical
         embed.description = "This update should not have happened, WHOOPS!"
-    return embed
-
-def parse_riot_id(unclean_riot_id):
-    clean_riot_id = unclean_riot_id.strip()
-    if "#" not in clean_riot_id:
-        return None
-    parts = clean_riot_id.split("#",1)
-    username = parts[0]
-    tagline = parts[1]
-    if not username or not tagline:
-        return None
-    return (username,tagline.lower()) #tagline.lower() because taglines are not case sensitive, this gaurentees we dont handle the same riotid differently
-        
+    return embed 
 
 def bot_startup():
     try:
