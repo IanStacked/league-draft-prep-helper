@@ -1,6 +1,7 @@
 import discord
 import os
 import aiohttp
+import sys
 from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from firebase_admin import firestore
@@ -39,6 +40,9 @@ RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
 # Database Startup
 
 db = database_startup()
+if not db:
+    print("[CRITICAL ERROR] Database did not properly initialize")
+    sys.exit(1)
 
 # Bot Startup
 
