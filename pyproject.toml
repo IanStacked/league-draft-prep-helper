@@ -10,6 +10,7 @@ dependencies = [
     "google-auth>=2.41.1",
     "gspread>=6.2.1",
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
     "python-dotenv>=1.1.1",
     "ratelimit>=2.2.1",
 ]
