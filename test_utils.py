@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from utils import parse_riot_id, get_puuid, get_ranked_info
-from utils import UserNotFound
+from utils import parse_riot_id, get_puuid, get_ranked_info, call_riot_api
+from utils import UserNotFound, RateLimitError
 
 # Tests for Helper Functions
 
@@ -64,3 +64,32 @@ async def test_get_ranked_info_invalid_puuid(mock_session):
     mock_response.json.return_value = None
     with pytest.raises(UserNotFound):
         await get_ranked_info(mock_session, "puuid", "KEY")
+
+@pytest.mark.asyncio
+async def test_api_rate_limit_retry(mock_session):
+    response_429 = AsyncMock()
+    response_429.status = 429
+    response_429.headers = {"Retry-After": "1"}
+    response_200 = AsyncMock()
+    response_200.status = 200
+    response_200.json.return_value = {"key":"value"}
+    mock_context = mock_session.get.return_value
+    mock_context.__aenter__.side_effect = [response_429,response_200]
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        result = await call_riot_api(mock_session, "htpps://fakeurl.com", {})
+        assert result == {"key":"value"}
+        assert mock_session.get.call_count == 2
+        mock_sleep.assert_called_once_with(1)
+
+@pytest.mark.asyncio
+async def test_api_rate_limit_max_retries_exceeded(mock_session):
+    response_429 = AsyncMock()
+    response_429.status = 429
+    response_429.headers = {"Retry-After": "1"}
+    mock_context = mock_session.get.return_value
+    mock_context.__aenter__.side_effect = [response_429,response_429,response_429,response_429]
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(RateLimitError):
+            await call_riot_api(mock_session, "htpps://fakeurl.com", {})
+    assert mock_session.get.call_count == 3
+        
