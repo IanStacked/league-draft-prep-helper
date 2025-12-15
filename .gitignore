@@ -11,4 +11,6 @@ wheels/
 
 # Enviroment files
 serviceAccountKey.json
+league_bot_key.pem
 .env
+
