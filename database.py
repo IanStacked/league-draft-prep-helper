@@ -16,6 +16,8 @@ def database_startup():
             if firebase_json_env:
                 try:
                     cred_info = json.loads(firebase_json_env)
+                    if "private_key" in cred_info:
+                        cred_info["private_key"] = cred_info["private_key"].replace("\\n", "\n")
                     cred = credentials.Certificate(cred_info)
                     firebase_admin.initialize_app(cred)
                     print("✅ Firebase initialized successfully!")
