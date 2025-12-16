@@ -51,11 +51,19 @@ jobs:
       
       - name: Deploy to AWS EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DISCORD_KEY: ${{ secrets.DISCORD_PUBLIC_KEY }}
+          RIOT_KEY: ${{ secrets.RIOT_API_KEY }}
+          FIREBASE_CREDS: ${{ secrets.FIREBASE_CREDENTIALS_BASE64 }}
         with: 
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DISCORD_KEY, RIOT_KEY, FIREBASE_CREDS
           script: |
+            echo "DISCORD_PUBLIC_KEY=$DISCORD_KEY" > .env
+            echo "RIOT_API_KEY=$RIOT_KEY" >> .env
+            echo "FIREBASE_CREDENTIALS_BASE64=$FIREBASE_CREDS" >> .env
             sudo docker stop my-bot || true
             sudo docker rm my-bot || true
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/league-bot:latest
