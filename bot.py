@@ -12,7 +12,7 @@ from google.cloud.firestore import FieldFilter
 from database import database_startup
 from database import TRACKED_USERS_COLLECTION, GUILD_CONFIG_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
-from utils import get_puuid, get_ranked_info, parse_riot_id
+from utils import get_puuid, get_ranked_info, parse_riot_id, get_recent_match_info, extract_match_info
 
 # API Keys
 
@@ -82,7 +82,8 @@ class MyBot(commands.Bot):
             old_tier = doc.get("tier")
             old_rank = doc.get("rank")
             old_lp = doc.get("LP")
-            data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+            puuid = doc.get("puuid")
+            data = await get_ranked_info(bot.session, puuid, RIOT_API_KEY)
             new_tier = data.get("tier")
             new_rank = data.get("rank")
             new_lp = data.get("LP")
@@ -102,7 +103,9 @@ class MyBot(commands.Bot):
                     print(f"Error fetching config for guild {guild}: {e}")
                 if channel:
                     riot_id = doc.get("riot_id")
-                    embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id)
+                    match_info = await get_recent_match_info(bot.session, puuid, RIOT_API_KEY)
+                    processed_match_info = extract_match_info(match_info, puuid)
+                    embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id, processed_match_info)
                     await channel.send(embed=embed)
     
     @background_update_task.before_loop
@@ -233,7 +236,8 @@ async def update(ctx):
         old_tier = doc.get("tier")
         old_rank = doc.get("rank")
         old_lp = doc.get("LP")
-        data = await get_ranked_info(bot.session, doc.get("puuid"), RIOT_API_KEY)
+        puuid = doc.get("puuid")
+        data = await get_ranked_info(bot.session, puuid, RIOT_API_KEY)
         new_tier = data.get("tier")
         new_rank = data.get("rank")
         new_lp = data.get("LP")
@@ -242,7 +246,9 @@ async def update(ctx):
         if(old_tier == new_tier and old_rank == new_rank and old_lp == new_lp):
             continue
         riot_id = doc.get("riot_id")
-        embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id)
+        match_info = await get_recent_match_info(bot.session, puuid, RIOT_API_KEY)
+        processed_match_info = extract_match_info(match_info, puuid)
+        embed = create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id, processed_match_info)
         await ctx.send(embed=embed)
     return await ctx.send("Ranked information has been updated")
 
@@ -300,7 +306,7 @@ async def set_update_channel(ctx):
 
 # Helper Functions
 
-def create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id):
+def create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_lp, riot_id, processed_match_info):
     embed = discord.Embed(title = "Rank Update", color = discord.Color.purple())
     if(TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier)):
         embed.description = f"{riot_id} has DEMOTED from {old_tier} to {new_tier}"
@@ -317,6 +323,7 @@ def create_rankupdate_embed(old_tier, old_rank, old_lp, new_tier, new_rank, new_
     else:
         #this case only happens when both old and new ranked information are identical
         embed.description = "This update should not have happened, WHOOPS!"
+    embed.description += f"\n{processed_match_info.get("champion")} - {processed_match_info.get("kda_formatted")}"
     return embed 
 
 def bot_startup():

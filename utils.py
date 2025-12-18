@@ -41,6 +41,18 @@ async def call_riot_api(session, url, headers, retries=3):
     
 # Specific Data Fetchers
 
+async def get_recent_match_info(session, puuid, RIOT_API_KEY):
+    api_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&count=1"
+    headers = {
+        "X-Riot-Token": RIOT_API_KEY,
+        "Accept": "application/json",
+        "User-Agent": "LeagueHelperApp/1.0"
+    }
+    match_id = await call_riot_api(session, api_url, headers)
+    api_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{match_id[0]}"
+    match_info = await call_riot_api(session, api_url, headers)
+    return match_info
+    
 async def get_puuid(session, game_name, tag_line, RIOT_API_KEY):
     api_url = f"https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}"
     headers = {
@@ -83,6 +95,18 @@ async def get_ranked_info(session, puuid, RIOT_API_KEY):
         }
     
 # Helper Functions
+
+def extract_match_info(match_dto, puuid):
+    if not match_dto or "info" not in match_dto:
+        return None
+    participants = match_dto["info"].get("participants", [])
+    for p in participants:
+        if p.get("puuid") == puuid:
+            return {
+                "champion": p.get("championName"),
+                "kda_formatted": f"{p.get('kills')}/{p.get('deaths')}/{p.get('assists')}"
+            }
+    return None
 
 def parse_riot_id(unclean_riot_id):
     clean_riot_id = unclean_riot_id.strip()
