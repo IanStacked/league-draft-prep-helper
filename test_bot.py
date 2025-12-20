@@ -9,7 +9,7 @@ mock_database = MagicMock()
 mock_database.database_startup.return_value = MagicMock()
 mock_database.TRACKED_USERS_COLLECTION = "tracked_users"
 sys.modules["database"] = mock_database
-from bot import hello, track
+from bot import hello, track  # noqa: E402
 
 
 @pytest.fixture
@@ -59,5 +59,5 @@ async def test_track_success(mock_ctx, mock_db):
             assert saved_data["rank"] == "1"
             assert saved_data["LP"] == 10
             assert saved_data["server_info.123456789"]["added_by"] == 1
-            assert kwargs.get("merge") == True
+            assert kwargs.get("merge")
             mock_ctx.send.assert_called_with("bob#boom is now being tracked!")

@@ -4,7 +4,7 @@ import pytest
 
 from utils import (
     RateLimitError,
-    UserNotFound,
+    UserNotFoundError,
     call_riot_api,
     get_puuid,
     get_ranked_info,
@@ -91,7 +91,7 @@ async def test_get_ranked_info_invalid_puuid(mock_session):
     mock_response = mock_session.get.return_value.__aenter__.return_value
     mock_response.status = 404
     mock_response.json.return_value = None
-    with pytest.raises(UserNotFound):
+    with pytest.raises(UserNotFoundError):
         await get_ranked_info(mock_session, "puuid", "KEY")
 
 
