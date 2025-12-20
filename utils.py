@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+from logger_config import logger
 
 # Custom Exceptions
 
@@ -25,7 +26,7 @@ async def call_riot_api(session, url, headers, retries=3):
                     return await response.json()
                 elif response.status == 429:
                     retry_after = int(response.headers.get("Retry-After",1))
-                    print(f"⚠️ Rate Limit Hit! Sleeping for {retry_after} seconds...")
+                    logger.warning(f"⚠️ Rate Limit Hit! Sleeping for {retry_after} seconds...")
                     await asyncio.sleep(retry_after)
                     continue
                 #other errors - dont retry

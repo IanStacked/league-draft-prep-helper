@@ -4,6 +4,7 @@ import base64
 import os
 from firebase_admin import credentials
 from firebase_admin import firestore
+from logger_config import logger
 
 # Configuration
 
@@ -23,12 +24,12 @@ def database_startup():
                 cred_info = json.loads(json_str)
                 cred = credentials.Certificate(cred_info)
                 firebase_admin.initialize_app(cred)
-                print("✅ Firebase initialized successfully!")
+                logger.info("✅ Firebase initialized successfully!")
                 return firestore.client()
             else:
-                print("❌ ERROR: No Firebase credentials found.")
+                logger.error("❌ ERROR: No Firebase credentials found.")
                 return None
         except Exception as e:
-            print(f"❌ ERROR initializing Firebase: {e}")
+            logger.error(f"❌ ERROR: initializing Firebase: {e}")
             return None
     return firestore.client()

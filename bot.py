@@ -13,6 +13,7 @@ from database import database_startup
 from database import TRACKED_USERS_COLLECTION, GUILD_CONFIG_COLLECTION
 from utils import RateLimitError, RiotAPIError, UserNotFound
 from utils import get_puuid, get_ranked_info, parse_riot_id, get_recent_match_info, extract_match_info
+from logger_config import logger
 
 # API Keys
 
@@ -41,7 +42,7 @@ RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
 
 db = database_startup()
 if not db:
-    print("[CRITICAL ERROR] Database did not properly initialize")
+    logger.error("❌ ERROR: Database did not properly initialize")
     sys.exit(1)
 
 # Bot Startup
@@ -59,23 +60,23 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         #runs when the bot starts up.
         self.session = aiohttp.ClientSession()
-        print("✅ Persistent HTTP Session created.")
+        logger.info("✅ Persistent HTTP Session created.")
         if not self.background_update_task.is_running():
             self.background_update_task.start()
-            print("✅ Background update task started.")
+            logger.info("✅ Background update task started.")
 
     async def close(self):
         #runs when the bot shuts down.
         if self.session:
             await self.session.close()
-            print("🛑 HTTP Session closed.")
+            logger.info("🛑 HTTP Session closed.")
         await super().close()
     
     # Background Task
 
     @tasks.loop(minutes=10)
     async def background_update_task(self):
-        print("[PROCESS] Starting background update loop")
+        logger.info("♻️ Starting background update loop")
         docs = db.collection(TRACKED_USERS_COLLECTION).stream()
         doc_list = list(docs)
         for doc in doc_list:
@@ -100,7 +101,7 @@ class MyBot(commands.Bot):
                         channel_id = config.get("channel_id")
                         channel = bot.get_channel(channel_id)
                 except Exception as e:
-                    print(f"Error fetching config for guild {guild}: {e}")
+                    logger.error(f"❌ ERROR: fetching config for guild {guild}: {e}")
                 if channel:
                     riot_id = doc.get("riot_id")
                     match_info = await get_recent_match_info(bot.session, puuid, RIOT_API_KEY)
@@ -119,9 +120,9 @@ bot = MyBot()
 @bot.event
 async def on_ready():
     #called when bot initially connects
-    print(f"Bot connected as {bot.user.name} (ID: {bot.user.id}")
+    logger.info(f"✅ Bot connected as {bot.user.name} (ID: {bot.user.id})")
     if db is None:
-        print("WARNING: Database is not connected")
+        logger.warning("Database is not connected")
 
 # Global Error Handler
 
@@ -140,10 +141,10 @@ async def on_command_error(ctx, error):
         elif isinstance(original, RiotAPIError):
             await ctx.send(f"Riot API issue: {original}")
         else:
-            print(f"[CRITICAL ERROR] {original}")
+            logger.error(f"❌ ERROR: {original}")
             await ctx.send("An unexpected error occurred.")
     else:
-        print(f"Error: {error}")
+        logger.error(f"❌ ERROR: {error}")
 
 # Command Definitions
 
@@ -182,7 +183,7 @@ async def track(ctx, *, riot_id):
         }, merge=True)
         await ctx.send(f"{doc_id} is now being tracked!")
     except Exception as e:
-        print(f"Error tracking: {e}")
+        logger.error(f"❌ ERROR: tracking: {e}")
         await ctx.send("Database write failed.")
         raise e
 
@@ -218,7 +219,7 @@ async def untrack(ctx, *, riot_id):
             doc_ref.set(data)
             await ctx.send(f"{doc_id} is no longer tracked")
     except Exception as e:
-        print(f"Error untracking: {e}")
+        logger.error(f"❌ ERROR: untracking: {e}")
         await ctx.send("Database update failed")
 
 @bot.command(name="update", help="Manually updates ranked information of tracked users")
@@ -300,7 +301,7 @@ async def set_update_channel(ctx):
         }, merge=True)
         await ctx.send("Rank updates will now be posted in this channel")
     except Exception as e:
-        print(f"Error setting guild config: {e}")
+        logger.error(f"❌ ERROR: setting guild config: {e}")
         await ctx.send("Database write failed.")
         raise e
 
@@ -330,6 +331,6 @@ def bot_startup():
     try:
         bot.run(DISCORD_KEY)
     except discord.errors.LoginFailure:
-        print("\n[ERROR] Invalid Token detected. Please check your DISCORD_TOKEN.")
+        logger.error("❌ ERROR: Invalid Token detected. Please check your DISCORD_TOKEN.")
     except Exception as e:
-        print(f"\n[ERROR] An error occurred while running the bot: {e}")
+        logger.error(f"❌ ERROR: occurred while running the bot: {e}")
