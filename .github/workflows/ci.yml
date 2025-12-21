@@ -60,7 +60,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DISCORD_KEY, RIOT_KEY, FIREBASE_CREDS
+          envs: DISCORD_KEY, RIOT_KEY, FIREBASE_CREDS, SENTRY_DSN
           script: |
             echo "DISCORD_PUBLIC_KEY=$DISCORD_KEY" > .env
             echo "RIOT_API_KEY=$RIOT_KEY" >> .env

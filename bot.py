@@ -53,7 +53,10 @@ RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
 
 db = database_startup()
 if not db:
-    logger.error("❌ ERROR: Database did not properly initialize")
+    logger.error(
+        "❌ ERROR: Database did not properly initialize",
+        exc_info = True,
+    )
     sys.exit(1)
 
 # Bot Startup
@@ -114,7 +117,9 @@ class MyBot(commands.Bot):
                         channel_id = config.get("channel_id")
                         channel = bot.get_channel(channel_id)
                 except Exception as e:
-                    logger.error(f"❌ ERROR: fetching config for guild {guild}: {e}")
+                    logger.exception(
+                        f"❌ ERROR: fetching config for guild {guild}: {e}"
+                    )
                 if channel:
                     riot_id = doc.get("riot_id")
                     match_info = await get_recent_match_info(
@@ -160,19 +165,20 @@ async def on_command_error(ctx, error):
         await ctx.send("Sorry, I don't know that command")
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"Missing arguments. Usage: '{ctx.command.signature}'")
-    elif isinstance(error, commands.CommandInvokeError):
-        original = error.original
-        if isinstance(original, UserNotFoundError):
-            await ctx.send(f"User Not Found: {original}")
-        elif isinstance(original, RateLimitError):
-            await ctx.send(f"Bot is busy, try again in a minute: {original}")
-        elif isinstance(original, RiotAPIError):
-            await ctx.send(f"Riot API issue: {original}")
-        else:
-            logger.error(f"❌ ERROR: {original}")
-            await ctx.send("An unexpected error occurred.")
     else:
-        logger.error(f"❌ ERROR: {error}")
+        actual_error = getattr(error, "original", error)
+        if isinstance(actual_error, UserNotFoundError):
+            await ctx.send(f"User Not Found: {actual_error}")
+        elif isinstance(actual_error, RateLimitError):
+            await ctx.send(f"Bot is busy, try again in a minute: {actual_error}")
+        elif isinstance(actual_error, RiotAPIError):
+            await ctx.send(f"Riot API issue: {actual_error}")
+        else:
+            logger.error(
+                f"❌ ERROR: {actual_error}",
+                exc_info = actual_error
+            )
+            await ctx.send("An unexpected error occurred.")
 
 
 # Command Definitions
@@ -219,7 +225,7 @@ async def track(ctx, *, riot_id):
         )
         await ctx.send(f"{doc_id} is now being tracked!")
     except Exception as e:
-        logger.error(f"❌ ERROR: tracking: {e}")
+        logger.exception(f"❌ ERROR: tracking: {e}")
         await ctx.send("Database write failed.")
         raise e
 
@@ -261,7 +267,7 @@ async def untrack(ctx, *, riot_id):
             doc_ref.set(data)
             await ctx.send(f"{doc_id} is no longer tracked")
     except Exception as e:
-        logger.error(f"❌ ERROR: untracking: {e}")
+        logger.exception(f"❌ ERROR: untracking: {e}")
         await ctx.send("Database update failed")
 
 
@@ -375,7 +381,7 @@ async def set_update_channel(ctx):
         doc_ref.set({"channel_id": ctx.channel.id}, merge=True)
         await ctx.send("Rank updates will now be posted in this channel")
     except Exception as e:
-        logger.error(f"❌ ERROR: setting guild config: {e}")
+        logger.exception(f"❌ ERROR: setting guild config: {e}")
         await ctx.send("Database write failed.")
         raise e
 
@@ -425,8 +431,8 @@ def bot_startup():
     try:
         bot.run(DISCORD_KEY)
     except discord.errors.LoginFailure:
-        logger.error(
+        logger.exception(
             "❌ ERROR: Invalid Token detected. Please check your DISCORD_TOKEN."
         )
     except Exception as e:
-        logger.error(f"❌ ERROR: occurred while running the bot: {e}")
+        logger.exception(f"❌ ERROR: occurred while running the bot: {e}")
