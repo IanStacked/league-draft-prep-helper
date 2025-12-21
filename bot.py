@@ -53,10 +53,7 @@ RANK_ORDER = {"I": 4, "II": 3, "III": 2, "IV": 1, "": 0}
 
 db = database_startup()
 if not db:
-    logger.error(
-        "❌ ERROR: Database did not properly initialize",
-        exc_info = True,
-    )
+    logger.error("❌ ERROR: Database did not properly initialize")
     sys.exit(1)
 
 # Bot Startup

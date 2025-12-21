@@ -32,6 +32,6 @@ def database_startup():
                 logger.error("❌ ERROR: No Firebase credentials found.")
                 return None
         except Exception as e:
-            logger.error(f"❌ ERROR: initializing Firebase: {e}")
+            logger.exception(f"❌ ERROR: initializing Firebase: {e}")
             return None
     return firestore.client()
