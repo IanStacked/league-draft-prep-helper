@@ -64,6 +64,7 @@ jobs:
             echo "DISCORD_PUBLIC_KEY=$DISCORD_KEY" > .env
             echo "RIOT_API_KEY=$RIOT_KEY" >> .env
             echo "FIREBASE_CREDENTIALS_BASE64=$FIREBASE_CREDS" >> .env
+            echo "ENV=production" >> .env
             sudo docker stop my-bot || true
             sudo docker rm my-bot || true
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/league-bot:latest

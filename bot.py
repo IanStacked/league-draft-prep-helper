@@ -10,6 +10,7 @@ from google.cloud.firestore import FieldFilter
 
 from database import GUILD_CONFIG_COLLECTION, TRACKED_USERS_COLLECTION, database_startup
 from logger_config import logger
+from sentry_config import setup_sentry
 from utils import (
     RateLimitError,
     RiotAPIError,
@@ -26,6 +27,10 @@ from utils import (
 load_dotenv()
 DISCORD_KEY = os.getenv("DISCORD_PUBLIC_KEY")
 RIOT_API_KEY = os.getenv("RIOT_API_KEY")
+
+# Sentry Initialization
+
+setup_sentry()
 
 # Sorting Helpers
 

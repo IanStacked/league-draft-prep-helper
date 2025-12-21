@@ -3,7 +3,9 @@ import sys
 
 
 def setup_logging():
-    logger = logging.getLogger("league_bot")
+    logger = logging.getLogger()
+    if logger.hasHandlers():
+        logger.handlers.clear()
     logger.setLevel(logging.INFO)  # Capture everything INFO and above (WARNING, ERROR)
     c_handler = logging.StreamHandler(sys.stdout)
     c_format = logging.Formatter(
