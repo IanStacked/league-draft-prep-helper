@@ -34,7 +34,7 @@ async def call_riot_api(session, url, headers, retries=3):
                 elif response.status == 429:
                     retry_after = int(response.headers.get("Retry-After", 1))
                     logger.warning(
-                        f"⚠️ Rate Limit Hit! Sleeping for {retry_after} seconds..."
+                        f"⚠️ Rate Limit Hit! Sleeping for {retry_after} seconds...",
                     )
                     await asyncio.sleep(retry_after)
                     continue

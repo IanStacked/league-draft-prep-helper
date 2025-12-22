@@ -115,12 +115,14 @@ class MyBot(commands.Bot):
                         channel = bot.get_channel(channel_id)
                 except Exception as e:
                     logger.exception(
-                        f"❌ ERROR: fetching config for guild {guild}: {e}"
+                        f"❌ ERROR: fetching config for guild {guild}: {e}",
                     )
                 if channel:
                     riot_id = doc.get("riot_id")
                     match_info = await get_recent_match_info(
-                        bot.session, puuid, RIOT_API_KEY
+                        bot.session,
+                        puuid,
+                        RIOT_API_KEY,
                     )
                     processed_match_info = extract_match_info(match_info, puuid)
                     embed = create_rankupdate_embed(
@@ -173,7 +175,7 @@ async def on_command_error(ctx, error):
         else:
             logger.error(
                 f"❌ ERROR: {actual_error}",
-                exc_info = actual_error
+                exc_info=actual_error,
             )
             await ctx.send("An unexpected error occurred.")
 
@@ -188,7 +190,8 @@ async def hello(ctx):
 
 
 @bot.command(
-    name="track", help="Adds player to list of players tracked by bot given riotid"
+    name="track",
+    help="Adds player to list of players tracked by bot given riotid",
 )
 async def track(ctx, *, riot_id):
     if db is None:
@@ -196,7 +199,7 @@ async def track(ctx, *, riot_id):
     parsed = parse_riot_id(riot_id)
     if not parsed:
         return await ctx.send(
-            "Invalid input, please ensure syntax is: !track username#tagline"
+            "Invalid input, please ensure syntax is: !track username#tagline",
         )
     username = parsed[0]
     tagline = parsed[1]
@@ -237,7 +240,7 @@ async def untrack(ctx, *, riot_id):
     parsed = parse_riot_id(riot_id)
     if not parsed:
         return await ctx.send(
-            "Invalid input, please ensure syntax is: !untrack username#tagline"
+            "Invalid input, please ensure syntax is: !untrack username#tagline",
         )
     username = parsed[0]
     tagline = parsed[1]
@@ -333,7 +336,7 @@ async def leaderboard(ctx):
                 "tier": data.get("tier", "UNRANKED"),
                 "rank": data.get("rank", ""),
                 "lp": data.get("LP", 0),
-            }
+            },
         )
     leaderboard_data.sort(
         key=lambda x: (
@@ -344,7 +347,8 @@ async def leaderboard(ctx):
         reverse=True,
     )
     embed = discord.Embed(
-        title=f"🏆 Leaderboard for {ctx.guild.name}", color=discord.Color.gold()
+        title=f"🏆 Leaderboard for {ctx.guild.name}",
+        color=discord.Color.gold(),
     )
     description = ""
     for i, player in enumerate(leaderboard_data, 1):
@@ -359,7 +363,7 @@ async def leaderboard(ctx):
         description += (
             f"{rank_prefix} **{player['name']}** - "
             f"{player['tier']} {player['rank']} ({player['lp']} LP)\n"
-            )
+        )
     embed.description = description
     await ctx.send(embed=embed)
 
@@ -367,7 +371,7 @@ async def leaderboard(ctx):
 @bot.command(
     name="updateshere",
     help="Defaults rank updates to post in the channel wherever this command is used "
-    "[NOTE]: If this command is not used, by default the bot will simply " \
+    "[NOTE]: If this command is not used, by default the bot will simply "
     "not post live ranked updates",
 )
 async def set_update_channel(ctx):
@@ -409,7 +413,7 @@ def create_rankupdate_embed(
         embed.description = (
             f"{riot_id} has PROMOTED from "
             f"{old_tier} {old_rank} to {new_tier} {new_rank}"
-            )
+        )
     elif old_lp > new_lp:
         embed.description = f"{riot_id} lost {old_lp - new_lp} LP"
     elif old_lp < new_lp:
@@ -420,7 +424,7 @@ def create_rankupdate_embed(
     embed.description += (
         f"\n{processed_match_info.get('champion')} - "
         f"{processed_match_info.get('kda_formatted')}"
-        )
+    )
     return embed
 
 
@@ -429,7 +433,7 @@ def bot_startup():
         bot.run(DISCORD_KEY)
     except discord.errors.LoginFailure:
         logger.exception(
-            "❌ ERROR: Invalid Token detected. Please check your DISCORD_TOKEN."
+            "❌ ERROR: Invalid Token detected. Please check your DISCORD_TOKEN.",
         )
     except Exception as e:
         logger.exception(f"❌ ERROR: occurred while running the bot: {e}")

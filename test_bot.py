@@ -46,7 +46,8 @@ async def test_track_success(mock_ctx, mock_db):
     with patch("bot.get_puuid", new_callable=AsyncMock) as fake_get_puuid:
         fake_get_puuid.return_value = 12345
         with patch(
-            "bot.get_ranked_info", new_callable=AsyncMock
+            "bot.get_ranked_info",
+            new_callable=AsyncMock,
         ) as fake_get_ranked_info:
             fake_get_ranked_info.return_value = {"tier": "paper", "rank": "1", "LP": 10}
             await track(mock_ctx, riot_id=fake_riot_id)

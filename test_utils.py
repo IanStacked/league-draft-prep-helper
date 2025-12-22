@@ -125,5 +125,5 @@ async def test_api_rate_limit_max_retries_exceeded(mock_session):
         response_429,
     ]
     with patch("asyncio.sleep", new_callable=AsyncMock), pytest.raises(RateLimitError):
-            await call_riot_api(mock_session, "htpps://fakeurl.com", {})
+        await call_riot_api(mock_session, "htpps://fakeurl.com", {})
     assert mock_session.get.call_count == 3
