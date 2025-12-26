@@ -89,53 +89,59 @@ class MyBot(commands.Bot):
 
     @tasks.loop(minutes=10)
     async def background_update_task(self):
-        logger.info("♻️ Starting background update loop")
-        docs = db.collection(TRACKED_USERS_COLLECTION).stream()
-        doc_list = list(docs)
-        for doc in doc_list:
-            old_tier = doc.get("tier")
-            old_rank = doc.get("rank")
-            old_lp = doc.get("LP")
-            puuid = doc.get("puuid")
-            data = await get_ranked_info(bot.session, puuid, RIOT_API_KEY)
-            new_tier = data.get("tier")
-            new_rank = data.get("rank")
-            new_lp = data.get("LP")
-            doc.reference.update(data)
-            if old_tier == new_tier and old_rank == new_rank and old_lp == new_lp:
-                continue
-            guild_ids = doc.get("guild_ids")
-            for guild in guild_ids:
-                channel = None
-                try:
-                    config_ref = db.collection(GUILD_CONFIG_COLLECTION).document(guild)
-                    config = config_ref.get()
-                    if config.exists:
-                        channel_id = config.get("channel_id")
-                        channel = bot.get_channel(channel_id)
-                except Exception as e:
-                    logger.exception(
-                        f"❌ ERROR: fetching config for guild {guild}: {e}",
-                    )
-                if channel:
-                    riot_id = doc.get("riot_id")
-                    match_info = await get_recent_match_info(
-                        bot.session,
-                        puuid,
-                        RIOT_API_KEY,
-                    )
-                    processed_match_info = extract_match_info(match_info, puuid)
-                    embed = create_rankupdate_embed(
-                        old_tier,
-                        old_rank,
-                        old_lp,
-                        new_tier,
-                        new_rank,
-                        new_lp,
-                        riot_id,
-                        processed_match_info,
-                    )
-                    await channel.send(embed=embed)
+        try:
+            logger.info("♻️ Starting background update loop")
+            docs = db.collection(TRACKED_USERS_COLLECTION).stream()
+            doc_list = list(docs)
+            for doc in doc_list:
+                old_tier = doc.get("tier")
+                old_rank = doc.get("rank")
+                old_lp = doc.get("LP")
+                puuid = doc.get("puuid")
+                data = await get_ranked_info(bot.session, puuid, RIOT_API_KEY)
+                new_tier = data.get("tier")
+                new_rank = data.get("rank")
+                new_lp = data.get("LP")
+                doc.reference.update(data)
+                if old_tier == new_tier and old_rank == new_rank and old_lp == new_lp:
+                    continue
+                guild_ids = doc.get("guild_ids")
+                for guild in guild_ids:
+                    channel = None
+                    try:
+                        config_ref = (
+                            db.collection(GUILD_CONFIG_COLLECTION).document(guild)
+                        )
+                        config = config_ref.get()
+                        if config.exists:
+                            channel_id = config.get("channel_id")
+                            channel = bot.get_channel(channel_id)
+                    except Exception as e:
+                        logger.exception(
+                            f"❌ ERROR: fetching config for guild {guild}: {e}",
+                        )
+                    if channel:
+                        riot_id = doc.get("riot_id")
+                        match_info = await get_recent_match_info(
+                            bot.session,
+                            puuid,
+                            RIOT_API_KEY,
+                        )
+                        processed_match_info = extract_match_info(match_info, puuid)
+                        embed = create_rankupdate_embed(
+                            old_tier,
+                            old_rank,
+                            old_lp,
+                            new_tier,
+                            new_rank,
+                            new_lp,
+                            riot_id,
+                            processed_match_info,
+                        )
+                        await channel.send(embed=embed)
+        except Exception as e:
+            logger.exception(f"❌ ERROR: {e}")
+
 
     @background_update_task.before_loop
     async def before_background_task(self):
