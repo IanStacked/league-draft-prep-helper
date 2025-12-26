@@ -49,7 +49,7 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/league-bot:latest
           platforms: linux/amd64
       
-      - name: Deploy to AWS EC2
+      - name: Deploy to AWS EC2 and Verify Deployment
         uses: appleboy/ssh-action@v1.0.3
         env:
           DISCORD_KEY: ${{ secrets.DISCORD_PUBLIC_KEY }}
@@ -75,4 +75,23 @@ jobs:
               --env-file .env \
               --name my-bot \
               ${{ secrets.DOCKER_USERNAME }}/league-bot:latest
-      
+            echo "Waiting for initialization sequence..."
+            LOG_STEPS=(
+              "Sentry tracking initialized in production mode"
+              "Firebase initialized successfully"
+              "Persistent HTTP Session created"
+              "Background update task started"
+              "Bot connected as League Bot"
+              "Starting background update loop"
+            )
+            for step in "${LOG_STEPS[@]}"; do
+              echo "Checking for: $step..."
+              if timeout 20s sudo docker logs -f my-bot 2>&1 | grep -q -m 1 "$step"; then
+                echo "✅ $step"
+              else
+                echo "❌ Failed to find '$step' in time."
+                sudo docker logs my-bot
+                exit 1
+              fi
+            done
+            echo "🚀 Deployment fully verified. All systems operational."
