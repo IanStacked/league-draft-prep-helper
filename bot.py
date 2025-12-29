@@ -61,16 +61,33 @@ if not db:
 BOT_PREFIX = "!"
 
 class MyHelp(commands.MinimalHelpCommand):
+    def add_bot_commands_formatting(self, commands, _heading):
+        """This replaces the category heading with a simple bold 'Commands' label."""
+        if commands:
+            self.paginator.add_line("**Available Commands:**")
+            for command in commands:
+                self.add_subcommand_formatting(command)
+
     async def send_bot_help(self, mapping):
         self.paginator.add_line(
             "⚠️ **DISCLAIMER**: This bot is a personal project and is not " \
             "affiliated with Riot Games.",
         )
         self.paginator.add_line(
-            "[NOTE]: By default, the bot will not send live ranked updates until " \
-            "the !updateshere command is used",
+            "**NOTE**: By default, the bot will not send live ranked updates until " \
+            "the `!updateshere` command is used",
         )
+        self.paginator.add_line()
         await super().send_bot_help(mapping)
+
+    def get_ending_note(self):
+        """Adds a blank space before the 'Type !help command for more info' message."""
+        return f"\n{super().get_ending_note()}"
+
+    def get_opening_note(self):
+        """Only returns the 'help [command]' instruction, removing the category line."""
+        command_name = f"{self.context.clean_prefix}{self.invoked_with}"
+        return f"Use `{command_name} [command]` for more info on a command."
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -160,6 +177,7 @@ class MyBot(commands.Bot):
 
 
 bot = MyBot()
+bot.help_command = MyHelp()
 
 # Event Handlers
 
