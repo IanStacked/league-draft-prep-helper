@@ -9,7 +9,7 @@ mock_database = MagicMock()
 mock_database.database_startup.return_value = MagicMock()
 mock_database.TRACKED_USERS_COLLECTION = "tracked_users"
 sys.modules["database"] = mock_database
-from bot import hello, track  # noqa: E402
+from bot import track  # noqa: E402
 
 
 @pytest.fixture
@@ -31,14 +31,6 @@ def mock_db():
         mock_db_instance.document.return_value = document_mock
         document_mock.set = MagicMock()
         yield mock_db_instance
-
-
-@pytest.mark.asyncio
-async def test_hello_success(mock_ctx):
-    mock_ctx.author.display_name = "John"
-    await hello(mock_ctx)
-    mock_ctx.send.assert_called_with(f"Hello {mock_ctx.author.display_name}")
-
 
 @pytest.mark.asyncio
 async def test_track_success(mock_ctx, mock_db):
