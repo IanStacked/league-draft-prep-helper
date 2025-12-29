@@ -188,13 +188,6 @@ async def on_command_error(ctx, error):
 
 # Command Definitions
 
-
-@bot.command(name="hello", help="Greets the user back.")
-async def hello(ctx):
-    user_name = ctx.author.display_name
-    await ctx.send(f"Hello {user_name}")
-
-
 @bot.command(
     name="track",
     help="Adds player to list of players tracked by bot given riotid",
