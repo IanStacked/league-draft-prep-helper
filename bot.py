@@ -60,6 +60,17 @@ if not db:
 
 BOT_PREFIX = "!"
 
+class MyHelp(commands.MinimalHelpCommand):
+    async def send_bot_help(self, mapping):
+        self.paginator.add_line(
+            "⚠️ **DISCLAIMER**: This bot is a personal project and is not " \
+            "affiliated with Riot Games.",
+        )
+        self.paginator.add_line(
+            "[NOTE]: By default, the bot will not send live ranked updates until " \
+            "the !updateshere command is used",
+        )
+        await super().send_bot_help(mapping)
 
 class MyBot(commands.Bot):
     def __init__(self):
