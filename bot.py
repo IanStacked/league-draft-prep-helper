@@ -188,11 +188,14 @@ async def on_command_error(ctx, error):
 
 # Command Definitions
 
-@bot.command(
-    name="track",
-    help="Adds player to list of players tracked by bot given riotid",
-)
+@bot.command()
 async def track(ctx, *, riot_id):
+    """Adds a user to the list of users tracked by the bot.
+
+    Usage: !track <riotid>
+    Given a riotid, the bot will attempt to add the user to the bot's database,
+    "tracking" the user.
+    """
     if db is None:
         return await ctx.send("Database Error")
     parsed = parse_riot_id(riot_id)
@@ -229,11 +232,14 @@ async def track(ctx, *, riot_id):
         raise e
 
 
-@bot.command(
-    name="untrack",
-    help="Removes player from list of players tracked by bot given riotid",
-)
+@bot.command()
 async def untrack(ctx, *, riot_id):
+    """Removes a user from the list of users tracked by the bot.
+
+    Usage: !untrack <riotid>
+    Given a riotid, the bot will attempt to remove the user from the bot's database,
+    "untracking" the user.
+    """
     if db is None:
         return await ctx.send("Database Error")
     parsed = parse_riot_id(riot_id)
@@ -270,8 +276,13 @@ async def untrack(ctx, *, riot_id):
         await ctx.send("Database update failed")
 
 
-@bot.command(name="update", help="Manually updates ranked information of tracked users")
+@bot.command()
 async def update(ctx):
+    """Manually updates ranked information of tracked users in this server.
+
+    Usage: !update
+    Triggers ranked updates for all users in the server where this command is called
+    """
     if db is None:
         return await ctx.send("Database Error")
     guild_id_str = str(ctx.guild.id)
@@ -314,6 +325,11 @@ async def update(ctx):
 
 @bot.command(name="leaderboard", help="Prints the servers leaderboard of tracked users")
 async def leaderboard(ctx):
+    """Prints the servers leaderboard.
+
+    Usage: !leaderboard
+    Prints out the tracked users in order of rank from highest to lowest
+    """
     if db is None:
         return await ctx.send("Database Error")
     guild_id_str = str(ctx.guild.id)
@@ -367,13 +383,15 @@ async def leaderboard(ctx):
     await ctx.send(embed=embed)
 
 
-@bot.command(
-    name="updateshere",
-    help="Defaults rank updates to post in the channel wherever this command is used "
-    "[NOTE]: If this command is not used, by default the bot will simply "
-    "not post live ranked updates",
-)
+@bot.command()
 async def set_update_channel(ctx):
+    """Defaults automatic rank updates to post in this channel.
+
+    Usage: !updateshere
+    Automatic rank updates will post in the channel where this bot is used.
+    If this command is not used, by default the bot will simply not post
+    live ranked updates.
+    """
     if db is None:
         return await ctx.send("Database Error")
     doc_ref = db.collection(GUILD_CONFIG_COLLECTION).document(str(ctx.guild.id))
