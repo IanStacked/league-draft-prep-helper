@@ -1,7 +1,8 @@
 # LiveLOL
-A Discord bot that tracks League of Legends player ranks in real-time. 
+A Discord bot that tracks League of Legends players in real-time.
 
 ## System Architecture
+```mermaid
 graph LR
     %% Actors
     Dev((Developer))
@@ -11,6 +12,10 @@ graph LR
         Repo[GitHub Repo]
         Secrets[GitHub Secrets]
         Actions[Actions Runner]
+    end
+
+    subgraph Registry [Container Registry]
+        Image[Docker Image / GHCR]
     end
 
     subgraph AWS [AWS EC2 Instance]
@@ -34,7 +39,8 @@ graph LR
     Dev -->|Push Code| Repo
     Repo -->|Trigger Build| Actions
     Secrets -->|Inject Secrets| Actions
-    Actions -->|Deploy Image| Bot
+    Actions -->|Build & Push| Image
+    Image -->|Pull Image| Bot
     Actions -.->|Configures| Env
 
     %% User Interaction Path
@@ -49,10 +55,12 @@ graph LR
 
     %% Styling
     style GH fill:#ececec,stroke:#333,stroke-width:2px,color:#000000
+    style Registry fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#000000
     style AWS fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000000
     style Docker fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000
     style Discord fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000
     style External fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000000
+```
 
 ## Core Features
 1. Observability
@@ -67,6 +75,7 @@ graph LR
 4. DevOps Pipeline
     * Containerization for consistent deployment
     * Github Actions workflow for CI/CD
+    * Unit Tests
     * Linting via Ruff enforced before every push
 
 ## Tech Stack & Design Decisions
