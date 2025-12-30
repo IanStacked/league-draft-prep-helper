@@ -81,7 +81,7 @@ jobs:
               "Firebase initialized successfully"
               "Persistent HTTP Session created"
               "Background update task started"
-              "Bot connected as League Bot"
+              "Bot connected as LiveLOL"
               "Starting background update loop"
             )
             for step in "${LOG_STEPS[@]}"; do
