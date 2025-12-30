@@ -95,7 +95,15 @@ class MyBot(commands.Bot):
         intents.message_content = True
         intents.members = True
         intents.guilds = True
-        super().__init__(command_prefix=BOT_PREFIX, intents=intents)
+        activity = discord.Activity(
+            type=discord.ActivityType.watching,
+            name="Watching The Rift - !help",
+        )
+        super().__init__(
+            command_prefix=BOT_PREFIX,
+            intents=intents,
+            activity=activity,
+        )
         self.session = None  # placeholder
 
     async def setup_hook(self):
