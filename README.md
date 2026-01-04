@@ -62,6 +62,27 @@ graph LR
     style External fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000000
 ```
 
+## Preview
+
+The bot provides toggleable match summaries. Users can view a high-level rank update or expand the view to see the full role-sorted team breakdown.
+<table border="0">
+  <tr>
+    <td valign="top" width="45%">
+      <p align="center"><b>Minimized View</b></p>
+      <img src="assets/minimized_view.png" style="width:100%;">
+    </td>
+    <td valign="top" width="45%">
+      <p align="center"><b>Maximized View</b></p>
+      <img src="assets/maximized_view.png" style="width:100%;">
+    </td>
+  </tr>
+</table>
+
+Track the progress of everyone in your guild with a formatted, real-time leaderboard.
+<p align="center">
+<img src="assets/leaderboard.png" width="40%" alt="Leaderboard Screenshot" />
+</p>
+
 ## Core Features
 1. Observability
     * Sentry Integration
