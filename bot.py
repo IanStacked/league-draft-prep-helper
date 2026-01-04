@@ -353,7 +353,7 @@ async def on_command_error(ctx, error):
         await ctx.send("Sorry, I don't know that command")
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(
-            f"Missing arguments. Usage: {ctx.command} '{ctx.command.signature}'",
+            f"Missing arguments. Usage: !{ctx.command} '{ctx.command.signature}'",
         )
     else:
         actual_error = getattr(error, "original", error)
