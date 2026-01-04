@@ -114,11 +114,16 @@ def extract_match_info(match_dto, puuid):
     participants = match_dto["info"].get("participants", [])
     for p in participants:
         if p.get("puuid") == puuid:
-            return {
-                "champion": p.get("championName"),
-                "kda_formatted": f"{p.get('kills')}/{p.get('deaths')}/{p.get('assists')}",  # noqa: E501
-            }
-    return None
+            target_champion = p.get("championName")
+            target_kda = f"{p.get('kills')}/{p.get('deaths')}/{p.get('assists')}"
+            win = p.get("win")
+    info = {
+        "target_champion": target_champion,
+        "target_kda": target_kda,
+        "participants": participants,
+        "win": win,
+    }
+    return info
 
 
 def parse_riot_id(unclean_riot_id):

@@ -1,5 +1,7 @@
+import contextlib
 import os
 import sys
+import urllib.parse
 
 import aiohttp
 import discord
@@ -164,17 +166,23 @@ class MyBot(commands.Bot):
                             RIOT_API_KEY,
                         )
                         processed_match_info = extract_match_info(match_info, puuid)
-                        embed = create_rankupdate_embed(
-                            old_tier,
-                            old_rank,
-                            old_lp,
-                            new_tier,
-                            new_rank,
-                            new_lp,
-                            riot_id,
+                        ranked_data = {
+                            "old_tier": old_tier,
+                            "old_rank": old_rank,
+                            "old_lp": old_lp,
+                            "new_tier": new_tier,
+                            "new_rank": new_rank,
+                            "new_lp": new_lp,
+                        }
+                        view = MatchDetailsView(
                             processed_match_info,
+                            ranked_data,
+                            riot_id,
+                            puuid,
                         )
-                        await channel.send(embed=embed)
+                        initial_embed = view.create_minimized_embed()
+                        message = await channel.send(embed=initial_embed, view=view)
+                        view.message = message
         except Exception as e:
             logger.exception(f"❌ ERROR: {e}")
 
@@ -186,6 +194,144 @@ class MyBot(commands.Bot):
 
 bot = MyBot()
 bot.help_command = MyHelp()
+
+# Ranked Update Class
+
+class MatchDetailsView(discord.ui.View):
+    """A view that toggles between a simple rank update and a full match summary."""
+    def __init__(self, match_data, ranked_data, riot_id, puuid, timeout=259200):
+        super().__init__(timeout=timeout)
+        self.match_data = match_data
+        self.ranked_data = ranked_data
+        self.riot_id = riot_id
+        self.is_expanded = False
+        self.message = None
+        self.puuid = puuid
+        self.minimized_embed = self.create_minimized_embed()
+        self.maximized_embed = self.create_maximized_embed()
+        self.create_profile_buttons()
+
+    def create_profile_buttons(self):
+        try:
+            link_riot_id = self.riot_id.replace("#","-")
+            encoded_riot_id = urllib.parse.quote(link_riot_id)
+            opgg_url = f"https://op.gg/lol/summoners/na/{encoded_riot_id}"
+            deeplol_url = f"https://www.deeplol.gg/summoner/na/{encoded_riot_id}"
+            self.add_item(
+                discord.ui.Button(
+                    label="OP.GG",
+                    url=opgg_url,
+                    style=discord.ButtonStyle.link,
+                ),
+            )
+            self.add_item(
+                discord.ui.Button(
+                    label="DeepLol",
+                    url=deeplol_url,
+                    style=discord.ButtonStyle.link,
+                ),
+            )
+        except Exception as e:
+            logger.error(f"Failed to add profile buttons: {e}")
+
+    def create_minimized_embed(self):
+        """Creates the minimized embed with information only on the target player."""
+        partial_description = extract_minimized_embed_description(
+            self.ranked_data,
+            self.riot_id,
+        )
+        if self.match_data.get("win"):
+            color = discord.Color.green()
+        else:
+            color = discord.Color.red()
+        description = partial_description + (
+            f"\n{self.match_data.get('target_champion')}"
+            f" ({self.match_data.get('target_kda')})"
+        )
+        embed = discord.Embed(
+            title="Rank Update",
+            description=description,
+            color=color,
+        )
+        return embed
+
+    def create_maximized_embed(self):
+        """Creates the maximized embed with information on all players."""
+        participants = self.match_data.get("participants")
+        role_order = {
+            "TOP": 0, #Top
+            "JUNGLE": 1, #Jungle
+            "MIDDLE": 2, #Mid
+            "BOTTOM": 3, #ADC
+            "UTILITY": 4, #Support
+        }
+        sorted_participants = sorted(
+            participants,
+            key=lambda p: (
+                p["teamId"],
+                role_order.get(p.get("teamPosition",""), 5),
+            ),
+        )
+        blue_team = []
+        red_team = []
+        for p in sorted_participants:
+            champion = p.get("championName")
+            kda = f"{p.get('kills')}/{p.get('deaths')}/{p.get('assists')}"
+            game_name = p.get('riotIdGameName')
+            tag_line = p.get('riotIdTagline')
+            line = f"**{(game_name + '#' + tag_line):<10}** - {champion} ({kda})"
+            if p['teamId'] == 100:
+                blue_team.append(line)
+            else:
+                red_team.append(line)
+        embed = discord.Embed(
+            title="Match Summary",
+            color=discord.Color.purple(),
+        )
+        embed.add_field(
+            name="🟦 Blue Team",
+            value="\n".join(blue_team),
+            inline=False,
+        )
+        embed.add_field(
+            name="🟥 Red Team",
+            value="\n".join(red_team),
+            inline=False,
+        )
+        return embed
+
+    @discord.ui.button(
+        label="Show Match Details",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def toggle_details(self, interaction, button):
+        self.is_expanded = not self.is_expanded
+        if self.is_expanded:
+            embed = self.maximized_embed
+            button.label = "Show Minimized View"
+        else:
+            embed = self.minimized_embed
+            button.label = "Show Match Summary"
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            if (
+                isinstance(
+                    item,
+                    discord.ui.Button,
+                ) and item.style != discord.ButtonStyle.link
+            ):
+                item.disabled = True
+        if self.message:
+            with contextlib.suppress(
+                discord.HTTPException,
+                discord.NotFound,
+                discord.Forbidden,
+                ):
+                await self.message.edit(view=self)
+        self.stop()
+
 
 # Event Handlers
 
@@ -346,17 +492,18 @@ async def update(ctx):
         riot_id = doc.get("riot_id")
         match_info = await get_recent_match_info(bot.session, puuid, RIOT_API_KEY)
         processed_match_info = extract_match_info(match_info, puuid)
-        embed = create_rankupdate_embed(
-            old_tier,
-            old_rank,
-            old_lp,
-            new_tier,
-            new_rank,
-            new_lp,
-            riot_id,
-            processed_match_info,
-        )
-        await ctx.send(embed=embed)
+        ranked_data = {
+            "old_tier": old_tier,
+            "old_rank": old_rank,
+            "old_lp": old_lp,
+            "new_tier": new_tier,
+            "new_rank": new_rank,
+            "new_lp": new_lp,
+        }
+        view = MatchDetailsView(processed_match_info, ranked_data, riot_id, puuid)
+        initial_embed = view.create_minimized_embed()
+        message = await ctx.send(embed=initial_embed, view=view)
+        view.message = message
     return await ctx.send("Ranked information has been updated")
 
 
@@ -444,43 +591,33 @@ async def set_update_channel(ctx):
 # Helper Functions
 
 
-def create_rankupdate_embed(
-    old_tier,
-    old_rank,
-    old_lp,
-    new_tier,
-    new_rank,
-    new_lp,
-    riot_id,
-    processed_match_info,
-):
-    embed = discord.Embed(title="Rank Update", color=discord.Color.purple())
+def extract_minimized_embed_description(ranked_data, riot_id):
+    old_tier = ranked_data.get("old_tier")
+    old_rank = ranked_data.get("old_rank")
+    old_lp = ranked_data.get("old_lp")
+    new_tier = ranked_data.get("new_tier")
+    new_rank = ranked_data.get("new_rank")
+    new_lp = ranked_data.get("new_lp")
     if TIER_ORDER.get(old_tier) > TIER_ORDER.get(new_tier):
-        embed.description = f"{riot_id} has DEMOTED from {old_tier} to {new_tier}"
+        return f"{riot_id} has DEMOTED from {old_tier} to {new_tier}"
     elif TIER_ORDER.get(old_tier) < TIER_ORDER.get(new_tier):
-        embed.description = f"{riot_id} has PROMOTED from {old_tier} to {new_tier}"
+        return f"{riot_id} has PROMOTED from {old_tier} to {new_tier}"
     elif RANK_ORDER.get(old_rank) > RANK_ORDER.get(new_rank):
-        embed.description = (
+        return (
             f"{riot_id} has DEMOTED from {old_tier} {old_rank} to {new_tier} {new_rank}"
         )
     elif RANK_ORDER.get(old_rank) < RANK_ORDER.get(new_rank):
-        embed.description = (
+        return (
             f"{riot_id} has PROMOTED from "
             f"{old_tier} {old_rank} to {new_tier} {new_rank}"
         )
     elif old_lp > new_lp:
-        embed.description = f"{riot_id} lost {old_lp - new_lp} LP"
+        return f"{riot_id} lost {old_lp - new_lp} LP"
     elif old_lp < new_lp:
-        embed.description = f"{riot_id} gained {new_lp - old_lp} LP"
+        return f"{riot_id} gained {new_lp - old_lp} LP"
     else:
         # this case only happens when both old and new ranked information are identical
-        embed.description = "This update should not have happened, WHOOPS!"
-    embed.description += (
-        f"\n{processed_match_info.get('champion')} - "
-        f"{processed_match_info.get('kda_formatted')}"
-    )
-    return embed
-
+        return "This update should not have happened, WHOOPS!"
 
 def bot_startup():
     try:
