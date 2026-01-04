@@ -1,6 +1,9 @@
 # LiveLOL
 A Discord bot that tracks League of Legends players in real-time.
 
+To install the bot to your server, simply click this link and follow the instructions.
+https://discord.com/oauth2/authorize?client_id=1441206408577290400
+
 ## System Architecture
 ```mermaid
 graph LR
